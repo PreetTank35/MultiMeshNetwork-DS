@@ -3,20 +3,168 @@
 @tailwind utilities;
 
 @layer base {
-  body { margin:0; padding:0; background:#0B1120; color:#F8FAFC; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; overflow:hidden; }
-  ::selection { background:rgba(59,130,246,0.35) }
+  body {
+    margin: 0;
+    padding: 0;
+    background: #161B26;
+    color: #F1F5F9;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+  }
+  ::selection {
+    background: rgba(37, 99, 235, 0.4);
+    color: #FFFFFF;
+  }
 }
 
 @layer utilities {
-  .glass { background:rgba(15,23,42,0.75); backdrop-filter:blur(16px) saturate(1.4); -webkit-backdrop-filter:blur(16px) saturate(1.4); border:1px solid rgba(51,65,85,0.5) }
-  .glass-light { background:rgba(30,41,59,0.6); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(51,65,85,0.4) }
+  /* Tactical Neomorphic Surfaces */
+  .neu-base {
+    background: #161B26;
+  }
+  
+  .neu-flat {
+    background: #1B202E;
+    box-shadow: 6px 6px 14px #0f131b, -6px -6px 14px #1f2737;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .neu-flat-sm {
+    background: #1B202E;
+    box-shadow: 3px 3px 8px #0f131b, -3px -3px 8px #1f2737;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .neu-convex {
+    background: linear-gradient(145deg, #1f2637, #181d29);
+    box-shadow: 6px 6px 14px #0f131b, -6px -6px 14px #222b3d;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .neu-convex-sm {
+    background: linear-gradient(145deg, #1f2637, #181d29);
+    box-shadow: 3px 3px 8px #0f131b, -3px -3px 8px #222b3d;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .neu-pressed {
+    background: #131722;
+    box-shadow: inset 4px 4px 8px #0d1017, inset -4px -4px 8px #1d2433;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+  }
+
+  .neu-pressed-sm {
+    background: #131722;
+    box-shadow: inset 2px 2px 5px #0d1017, inset -2px -2px 5px #1d2433;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+  }
+
+  .neu-button {
+    background: #1B202E;
+    box-shadow: 4px 4px 10px #0f131b, -4px -4px 10px #21293a;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .neu-button:hover:not(:disabled) {
+    background: #1E2537;
+    box-shadow: 5px 5px 12px #0e121a, -5px -5px 12px #242d40;
+    transform: translateY(-0.5px);
+  }
+
+  .neu-button:active:not(:disabled),
+  .neu-button.active {
+    background: #131722;
+    box-shadow: inset 3px 3px 6px #0d1017, inset -3px -3px 6px #1f2737;
+    transform: translateY(1px);
+    border-color: rgba(255, 255, 255, 0.02);
+  }
+
+  .neu-button-sm {
+    background: #1B202E;
+    box-shadow: 2px 2px 6px #0f131b, -2px -2px 6px #21293a;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .neu-button-sm:hover:not(:disabled) {
+    background: #1E2537;
+    box-shadow: 3px 3px 8px #0e121a, -3px -3px 8px #242d40;
+  }
+
+  .neu-button-sm:active:not(:disabled),
+  .neu-button-sm.active {
+    background: #131722;
+    box-shadow: inset 2px 2px 4px #0d1017, inset -2px -2px 4px #1f2737;
+    transform: translateY(0.5px);
+  }
+
+  /* LED Indicators */
+  .neu-led-wifi {
+    box-shadow: 0 0 8px #2563EB, inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+  }
+  .neu-led-iot {
+    box-shadow: 0 0 8px #059669, inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+  }
+  .neu-led-gateway {
+    box-shadow: 0 0 8px #D97706, inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+  }
+  .neu-led-route {
+    box-shadow: 0 0 8px #06B6D4, inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+  }
+  .neu-led-failure {
+    box-shadow: 0 0 8px #DC2626, inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+  }
+
+  /* Retain glass utility for backward compatibility but style with tactile neomorphic backdrop */
+  .glass {
+    background: rgba(27, 32, 46, 0.88);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    box-shadow: 6px 6px 16px #0f131b, -6px -6px 16px #1f2737;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-light {
+    background: rgba(27, 32, 46, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 6px 6px 16px #0f131b, -6px -6px 16px #1f2737;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
 }
 
-.custom-scrollbar::-webkit-scrollbar { width:4px; height:4px }
-.custom-scrollbar::-webkit-scrollbar-track { background:transparent }
-.custom-scrollbar::-webkit-scrollbar-thumb { background:rgba(51,65,85,0.6); border-radius:4px }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background:rgba(100,116,139,0.8) }
+/* Recessed Neomorphic Scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #131722;
+  box-shadow: inset 1px 1px 3px #0d1017, inset -1px -1px 3px #1d2433;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #252D3F;
+  border-radius: 4px;
+  box-shadow: 1px 1px 3px #0f131b;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #333E56;
+}
 
-@keyframes radio-wave { 0%{transform:scale(0);opacity:0.5} 100%{transform:scale(1);opacity:0} }
-@keyframes link-glow { 0%{stroke-dashoffset:20} 100%{stroke-dashoffset:0} }
-@keyframes drop-burst { 0%{transform:scale(1);opacity:1} 100%{transform:scale(2.5);opacity:0} }
+@keyframes radio-wave {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@keyframes link-glow {
+  0% { stroke-dashoffset: 20; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes drop-burst {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
