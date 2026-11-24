@@ -1,232 +1,138 @@
-/**
- * 3D Isometric Holographic Viewport
- * Built with Three.js WebGL rendering for immersive faculty presentations
- * Visualizes multi-mesh nodes as elevated 3D cylinders with parabolic packet trajectory arcs
- */
-
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { MeshNode, NetworkLink, Packet, SubMeshDomain } from '../../types/simulator';
 
-interface Isometric3DViewProps {
-  nodes: MeshNode[];
-  links: NetworkLink[];
-  submeshes: SubMeshDomain[];
-  activePackets: Packet[];
-}
+interface Props { nodes: MeshNode[]; links: NetworkLink[]; submeshes: SubMeshDomain[]; activePackets: Packet[] }
 
-export const Isometric3DView: React.FC<Isometric3DViewProps> = ({
-  nodes,
-  links,
-  submeshes,
-  activePackets,
-}) => {
+export const Isometric3DView: React.FC<Props> = ({ nodes, links, submeshes, activePackets }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const container = mountRef.current;
-    if (!container) return;
+    const el = mountRef.current;
+    if (!el) return;
+    const w = el.clientWidth, h = el.clientHeight;
 
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-
-    // 1. Scene & Isometric Camera Setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f172a);
-    scene.fog = new THREE.FogExp2(0x0f172a, 0.0012);
+    scene.background = new THREE.Color(0x0b1120);
+    scene.fog = new THREE.FogExp2(0x0b1120, 0.001);
 
-    const aspect = width / height;
-    const d = 350;
-    const camera = new THREE.OrthographicCamera(
-      -d * aspect,
-      d * aspect,
-      d,
-      -d,
-      1,
-      2000
-    );
-
-    // Standard Isometric angle: 45° azimuth, 35.264° elevation
+    const d = 350, aspect = w / h;
+    const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 2000);
     camera.position.set(400, 450, 400);
     camera.lookAt(400, 0, 300);
 
-    // 2. Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
+    renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    container.appendChild(renderer.domElement);
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    el.appendChild(renderer.domElement);
 
-    // 3. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dl = new THREE.DirectionalLight(0x38bdf8, 1.0);
+    dl.position.set(300, 600, 300); dl.castShadow = true;
+    dl.shadow.mapSize.width = 1024; dl.shadow.mapSize.height = 1024;
+    scene.add(dl);
+    scene.add(new THREE.PointLight(0xf59e0b, 0.4, 800));
 
-    const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
-    dirLight.position.set(200, 500, 200);
-    dirLight.castShadow = true;
-    scene.add(dirLight);
+    // Ground
+    const grid = new THREE.GridHelper(1200, 40, 0x1e293b, 0x141d2e);
+    grid.position.set(450, -2, 300);
+    scene.add(grid);
 
-    // 4. Ground Grid
-    const gridHelper = new THREE.GridHelper(1200, 40, 0x334155, 0x1e293b);
-    gridHelper.position.set(450, -5, 300);
-    scene.add(gridHelper);
-
-    // 5. Build 3D Node Meshes
-    const nodeMeshes = new Map<string, THREE.Group>();
-
+    // Nodes
     for (const node of nodes) {
-      const group = new THREE.Group();
-      const submesh = submeshes.find(s => s.id === node.submeshId);
-      const hexColor = node.type === 'gateway' ? 0xf59e0b : parseInt((submesh?.color || '#3B82F6').replace('#', '0x'), 16);
+      const sm = submeshes.find(s => s.id === node.submeshId);
+      const hex = node.type === 'gateway' ? 0xf59e0b : parseInt((sm?.color || '#3B82F6').replace('#', ''), 16);
+      const isGw = node.type === 'gateway';
+      const r = isGw ? 12 : 8, ht = isGw ? 30 : 18;
 
-      // Base cylinder
-      const geom = new THREE.CylinderGeometry(
-        node.type === 'gateway' ? 14 : 10,
-        node.type === 'gateway' ? 16 : 12,
-        node.type === 'gateway' ? 35 : 22,
-        24
+      const cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(r, r + 2, ht, 20),
+        new THREE.MeshStandardMaterial({ color: node.isAlive ? hex : 0x334155, metalness: 0.5, roughness: 0.35, emissive: node.isAlive ? hex : 0x000000, emissiveIntensity: 0.2 })
       );
-      const mat = new THREE.MeshStandardMaterial({
-        color: node.isAlive ? hexColor : 0x475569,
-        metalness: 0.6,
-        roughness: 0.3,
-        emissive: node.isAlive ? hexColor : 0x000000,
-        emissiveIntensity: 0.25
-      });
-      const cylinder = new THREE.Mesh(geom, mat);
-      cylinder.position.y = (node.type === 'gateway' ? 35 : 22) / 2;
-      group.add(cylinder);
+      cyl.position.set(node.position.x, ht / 2, node.position.y);
+      cyl.castShadow = true; cyl.receiveShadow = true;
+      scene.add(cyl);
 
-      // Top glowing sphere
-      const sphereGeom = new THREE.SphereGeometry(node.type === 'gateway' ? 8 : 6, 16, 16);
-      const sphereMat = new THREE.MeshBasicMaterial({
-        color: node.isAlive ? (node.type === 'gateway' ? 0xfffbeb : 0xffffff) : 0xef4444
-      });
-      const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-      sphere.position.y = (node.type === 'gateway' ? 35 : 22) + 5;
-      group.add(sphere);
-
-      // Position in world
-      group.position.set(node.position.x, 0, node.position.y);
-      scene.add(group);
-      nodeMeshes.set(node.id, group);
+      // Beacon sphere
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(isGw ? 6 : 4, 16, 16),
+        new THREE.MeshBasicMaterial({ color: node.isAlive ? 0xffffff : 0xef4444 })
+      );
+      sphere.position.set(node.position.x, ht + 4, node.position.y);
+      scene.add(sphere);
     }
 
-    // 6. Build 3D Link Lines
-    const linkLines: THREE.Line[] = [];
+    // Links
     for (const link of links) {
-      const srcNode = nodes.find(n => n.id === link.source);
-      const dstNode = nodes.find(n => n.id === link.target);
-      if (!srcNode || !dstNode) continue;
-
-      const points = [
-        new THREE.Vector3(srcNode.position.x, 10, srcNode.position.y),
-        new THREE.Vector3(dstNode.position.x, 10, dstNode.position.y)
-      ];
-
-      const geom = new THREE.BufferGeometry().setFromPoints(points);
-      const mat = new THREE.LineBasicMaterial({
-        color: link.isSevered ? 0xef4444 : (srcNode.submeshId !== dstNode.submeshId ? 0xf59e0b : 0x334155),
-        linewidth: 2,
-        transparent: true,
-        opacity: link.isSevered ? 0.3 : 0.8
-      });
-      const line = new THREE.Line(geom, mat);
+      const sn = nodes.find(n => n.id === link.source), dn = nodes.find(n => n.id === link.target);
+      if (!sn || !dn) continue;
+      const isInter = sn.submeshId !== dn.submeshId;
+      const pts = [new THREE.Vector3(sn.position.x, 8, sn.position.y), new THREE.Vector3(dn.position.x, 8, dn.position.y)];
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: link.isSevered ? 0xef4444 : isInter ? 0xf59e0b : 0x334155, transparent: true, opacity: link.isSevered ? 0.3 : 0.6 })
+      );
       scene.add(line);
-      linkLines.push(line);
     }
 
-    // 7. Dynamic Parabolic 3D Packet Arcs
-    const packetMeshGroup = new THREE.Group();
-    scene.add(packetMeshGroup);
+    // Packet group
+    const pktGroup = new THREE.Group();
+    scene.add(pktGroup);
 
-    // Orbit Drag Controls (Manual)
-    let isMouseDown = false;
-    let prevMousePos = { x: 0, y: 0 };
-    let theta = Math.PI / 4;
-    let phi = Math.PI / 6;
+    // Orbit
+    let mouseDown = false, prev = { x: 0, y: 0 }, theta = Math.PI / 4, phi = Math.PI / 5.5;
     const radius = 650;
-
-    const onMouseDown = (e: MouseEvent) => {
-      isMouseDown = true;
-      prevMousePos = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isMouseDown) return;
-      const dx = e.clientX - prevMousePos.x;
-      const dy = e.clientY - prevMousePos.y;
-      prevMousePos = { x: e.clientX, y: e.clientY };
-
-      theta -= dx * 0.005;
-      phi = Math.max(0.1, Math.min(Math.PI / 2.2, phi + dy * 0.005));
-
-      camera.position.x = 450 + radius * Math.cos(phi) * Math.sin(theta);
-      camera.position.y = radius * Math.sin(phi);
-      camera.position.z = 300 + radius * Math.cos(phi) * Math.cos(theta);
+    const onMD = (e: MouseEvent) => { mouseDown = true; prev = { x: e.clientX, y: e.clientY }; };
+    const onMM = (e: MouseEvent) => {
+      if (!mouseDown) return;
+      theta -= (e.clientX - prev.x) * 0.004; phi = Math.max(0.1, Math.min(Math.PI / 2.2, phi + (e.clientY - prev.y) * 0.004));
+      prev = { x: e.clientX, y: e.clientY };
+      camera.position.set(450 + radius * Math.cos(phi) * Math.sin(theta), radius * Math.sin(phi), 300 + radius * Math.cos(phi) * Math.cos(theta));
       camera.lookAt(450, 0, 300);
     };
+    const onMU = () => { mouseDown = false; };
+    el.addEventListener('mousedown', onMD); window.addEventListener('mousemove', onMM); window.addEventListener('mouseup', onMU);
 
-    const onMouseUp = () => {
-      isMouseDown = false;
-    };
-
-    container.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-
-    // Animation Loop
     let reqId: number;
     const animate = () => {
       reqId = requestAnimationFrame(animate);
+      while (pktGroup.children.length) pktGroup.remove(pktGroup.children[0]);
 
-      // Clear previous packet particles
-      while (packetMeshGroup.children.length > 0) {
-        packetMeshGroup.remove(packetMeshGroup.children[0]);
-      }
-
-      // Render 3D parabolic packet hops
-      const timeNow = performance.now() / 1000;
+      const t = performance.now() / 1000;
       for (const pkt of activePackets) {
-        const src = nodes.find(n => n.id === pkt.currentHop);
-        const dst = nodes.find(n => n.id === pkt.nextHop);
-        if (src && dst) {
-          const t = (timeNow * 1.5) % 1;
-          const px = src.position.x + (dst.position.x - src.position.x) * t;
-          const pz = src.position.y + (dst.position.y - src.position.y) * t;
-          // Parabolic jump arc: y = 4 * h * t * (1 - t)
-          const py = 15 + 4 * 70 * t * (1 - t);
-
-          const pktGeom = new THREE.SphereGeometry(5, 12, 12);
-          const pktMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-          const pktSphere = new THREE.Mesh(pktGeom, pktMat);
-          pktSphere.position.set(px, py, pz);
-          packetMeshGroup.add(pktSphere);
-        }
+        if (pkt.state !== 'transmitting') continue;
+        const sn = nodes.find(n => n.id === pkt.pathTraversed[pkt.pathTraversed.length - 2]);
+        const dn = nodes.find(n => n.id === pkt.currentHop);
+        if (!sn || !dn) continue;
+        const prog = (t * 1.5) % 1;
+        const px = sn.position.x + (dn.position.x - sn.position.x) * prog;
+        const pz = sn.position.y + (dn.position.y - sn.position.y) * prog;
+        const py = 12 + 4 * 60 * prog * (1 - prog); // parabolic arc
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 12), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+        ball.position.set(px, py, pz);
+        pktGroup.add(ball);
       }
 
       renderer.render(scene, camera);
     };
-
     animate();
 
     return () => {
       cancelAnimationFrame(reqId);
-      container.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      if (renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement);
-      }
+      el.removeEventListener('mousedown', onMD); window.removeEventListener('mousemove', onMM); window.removeEventListener('mouseup', onMU);
+      renderer.domElement.parentNode?.removeChild(renderer.domElement);
       renderer.dispose();
     };
   }, [nodes, links, submeshes, activePackets]);
 
   return (
-    <div className="relative w-full h-full bg-[#0F172A] overflow-hidden select-none">
+    <div className="w-full h-full relative bg-canvas-deep">
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
-      <div className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/60 shadow-lg text-xs font-mono text-slate-300">
-        <span className="text-amber-400 font-bold">3D Isometric Mode:</span> Drag with mouse to orbit around nodes & 3D parabolic packet arcs.
+      <div className="absolute top-4 left-4 glass rounded-xl px-3 py-1.5 text-[10px] font-mono text-slate-400">
+        <span className="text-amber-400 font-semibold">3D Isometric</span> — Drag to orbit • Parabolic packet arcs
       </div>
     </div>
   );

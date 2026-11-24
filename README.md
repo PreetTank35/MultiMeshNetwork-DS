@@ -88,3 +88,4 @@ Open your browser to `http://localhost:5173`.
 | **4. Fault Injection & Self-Healing** | 5:30–7:30 | In Fault Studio, click **"Sever Primary Gateway Link"** during an active packet flow. | Highlight instant autonomous rerouting: the simulator detects the severed link and forwards traffic through Backup Gateway B. Show live PDR meter and latency updating. |
 | **5. 3D Isometric View & Telemetry** | 7:30–9:00 | Click **"3D View"** in the left dock. Drag mouse to orbit. Open **Telemetry Dashboard**. | Demonstrate the 3D parabolic hop arcs, gateway queue buffer heatmap, and hop count histogram. |
 | **6. Trace Export & Defense** | 9:00–10:00 | Click **"Export Trace JSON"** in bottom bar. | Present the standardized schema matching Appendix A.1 of your project report for automated grading. |
+
