@@ -12,7 +12,8 @@ import {
   SimulationConfig,
   SimulationEvent,
   SubMeshDomain,
-  TelemetryMetrics
+  TelemetryMetrics,
+  TopologyExportJSON
 } from '../../types/simulator';
 import { calculateDistance, evaluatePhysicalLink } from '../math/rfPropagation';
 import { resolveAodvRoute, resolveHwmpRoute, resolveOlsrRoute, resolveRplRoute } from '../protocols/routing';
@@ -127,7 +128,11 @@ export class DiscreteEventEngine {
       if (!srcNode || !dstNode) continue;
 
       const submesh = this.submeshes.get(srcNode.submeshId);
-      const freqGhz = submesh?.frequencyBand === '5.2GHz' ? 5.2 : submesh?.frequencyBand === '5.8GHz' ? 5.8 : 2.4;
+      const freqGhz = submesh?.frequencyBand === '5.2GHz' ? 5.2
+        : submesh?.frequencyBand === '5.8GHz' ? 5.8
+        : submesh?.frequencyBand === '915MHz' ? 0.915
+        : submesh?.frequencyBand === '868MHz' ? 0.868
+        : 2.4;
 
       const evalResult = evaluatePhysicalLink(
         srcNode.position,
@@ -547,6 +552,260 @@ export class DiscreteEventEngine {
       'warn'
     );
     return true;
+  }
+
+  // ==========================================
+  // Dynamic Network Builder Engine Capabilities
+  // ==========================================
+
+  /**
+   * Adds a user-defined node dynamically into the active simulation topology
+   */
+  public addNode(node: MeshNode, autoConnectNearest: boolean = false): MeshNode {
+    const preparedNode: MeshNode = {
+      ...node,
+      currentQueue: [],
+      routingTable: {},
+      isAlive: node.isAlive !== undefined ? node.isAlive : true,
+    };
+    this.nodes.set(preparedNode.id, preparedNode);
+
+    if (autoConnectNearest && this.nodes.size > 1) {
+      let nearest: MeshNode | null = null;
+      let minDistance = Infinity;
+
+      for (const other of this.nodes.values()) {
+        if (other.id === preparedNode.id) continue;
+        const d = Math.hypot(other.position.x - preparedNode.position.x, other.position.y - preparedNode.position.y);
+        if (d < minDistance) {
+          minDistance = d;
+          nearest = other;
+        }
+      }
+
+      if (nearest) {
+        this.addLink(preparedNode.id, nearest.id);
+      }
+    }
+
+    this.refreshLinkProperties();
+    this.addLog(`[Builder] Added node "${preparedNode.name}" (${preparedNode.type}) at (${Math.round(preparedNode.position.x)}, ${Math.round(preparedNode.position.y)})`, 'info', undefined, preparedNode.id);
+    return preparedNode;
+  }
+
+  /**
+   * Removes a node and all of its incident links
+   */
+  public removeNode(nodeId: string): boolean {
+    const node = this.nodes.get(nodeId);
+    if (!node) return false;
+
+    // Remove connected links
+    const originalLinkCount = this.links.length;
+    this.links = this.links.filter(l => l.source !== nodeId && l.target !== nodeId);
+    const removedLinks = originalLinkCount - this.links.length;
+
+    // Delete node
+    this.nodes.delete(nodeId);
+
+    // Invalidate cached routing tables in remaining nodes
+    for (const n of this.nodes.values()) {
+      delete n.routingTable[nodeId];
+    }
+
+    this.addLog(`[Builder] Removed node "${node.name}" and ${removedLinks} connected link(s).`, 'warn');
+    return true;
+  }
+
+  /**
+   * Creates an RF-evaluated wireless link between two nodes
+   * Automatically computes Euclidean distance, Log-Distance / Friis path loss, SNR, and PER
+   */
+  public addLink(sourceId: string, targetId: string, bandwidthMbps?: number): NetworkLink | null {
+    if (sourceId === targetId) return null;
+
+    const srcNode = this.nodes.get(sourceId);
+    const dstNode = this.nodes.get(targetId);
+    if (!srcNode || !dstNode) return null;
+
+    // Prevent duplicate links
+    const existing = this.findLink(sourceId, targetId);
+    if (existing) {
+      this.addLog(`[Builder] Link between ${srcNode.name} and ${dstNode.name} already exists.`, 'warn');
+      return existing;
+    }
+
+    const submesh = this.submeshes.get(srcNode.submeshId);
+    const freqGhz = submesh?.frequencyBand === '5.2GHz' ? 5.2
+      : submesh?.frequencyBand === '5.8GHz' ? 5.8
+      : submesh?.frequencyBand === '915MHz' ? 0.915
+      : submesh?.frequencyBand === '868MHz' ? 0.868
+      : 2.4;
+
+    const evalResult = evaluatePhysicalLink(
+      srcNode.position,
+      dstNode.position,
+      srcNode.txPowerDbm,
+      freqGhz,
+      this.config
+    );
+
+    const defaultBw = (srcNode.type === 'sensor' || dstNode.type === 'sensor') ? 0.25 : 54;
+    const finalBandwidth = bandwidthMbps !== undefined && bandwidthMbps > 0 ? bandwidthMbps : defaultBw;
+
+    const newLink: NetworkLink = {
+      id: `link_${sourceId}_${targetId}_${Date.now()}`,
+      source: sourceId,
+      target: targetId,
+      bandwidthMbps: finalBandwidth,
+      lossRate: Math.min(Math.max(evalResult.per, 0.005), 0.95),
+      distanceMeters: evalResult.distanceMeters,
+      snrDb: evalResult.snrDb,
+      per: evalResult.per,
+      isSevered: false,
+      isJammed: false,
+      currentLoad: 0,
+      traversalCount: 0
+    };
+
+    this.links.push(newLink);
+    this.addLog(
+      `[Builder] Linked ${srcNode.name} ↔ ${dstNode.name} (Dist: ${evalResult.distanceMeters.toFixed(1)}m, SNR: ${evalResult.snrDb.toFixed(1)} dB, PER: ${(newLink.lossRate * 100).toFixed(1)}%)`,
+      'info'
+    );
+
+    return newLink;
+  }
+
+  /**
+   * Removes a specific link by ID
+   */
+  public removeLink(linkId: string): boolean {
+    const idx = this.links.findIndex(l => l.id === linkId);
+    if (idx === -1) return false;
+
+    const link = this.links[idx];
+    this.links.splice(idx, 1);
+    this.addLog(`[Builder] Severed and deleted link ${link.source} ↔ ${link.target}`, 'info');
+    return true;
+  }
+
+  /**
+   * Registers a new SubMeshDomain
+   */
+  public addSubMesh(domain: SubMeshDomain): SubMeshDomain {
+    this.submeshes.set(domain.id, domain);
+    this.addLog(`[Builder] Added Sub-Mesh domain "${domain.name}" [${domain.protocol} / ${domain.frequencyBand}]`, 'info');
+    return domain;
+  }
+
+  /**
+   * Removes a sub-mesh domain
+   */
+  public removeSubMesh(submeshId: string): boolean {
+    if (!this.submeshes.has(submeshId)) return false;
+    const sm = this.submeshes.get(submeshId)!;
+    this.submeshes.delete(submeshId);
+    this.addLog(`[Builder] Removed Sub-Mesh domain "${sm.name}"`, 'warn');
+    return true;
+  }
+
+  /**
+   * Clears the current canvas topology
+   */
+  public clearCanvas(keepSubmeshes: boolean = true) {
+    this.resetSimulation();
+    this.nodes.clear();
+    this.links = [];
+    if (!keepSubmeshes) {
+      this.submeshes.clear();
+    }
+    this.addLog('[Builder] Canvas cleared: All nodes and links removed.', 'warn');
+  }
+
+  /**
+   * Saves topology to LocalStorage
+   */
+  public saveToLocalStorage(key: string = 'multimesh_custom_network'): boolean {
+    try {
+      const data: TopologyExportJSON = {
+        simulatorConfig: this.config,
+        submeshes: Array.from(this.submeshes.values()),
+        nodes: Array.from(this.nodes.values()),
+        links: this.links,
+        meta: {
+          exportedAt: new Date().toISOString(),
+          version: '1.0.0',
+          scenarioTitle: 'Custom Multi-Mesh User Topology',
+          authors: ['User Custom Network']
+        }
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+      this.addLog(`[Storage] Saved network snapshot (${this.nodes.size} nodes, ${this.links.length} links) to "${key}".`, 'success');
+      return true;
+    } catch (err) {
+      this.addLog(`[Storage] Failed to save to localStorage: ${String(err)}`, 'error');
+      return false;
+    }
+  }
+
+  /**
+   * Loads topology from LocalStorage
+   */
+  public loadFromLocalStorage(key: string = 'multimesh_custom_network'): boolean {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        this.addLog(`[Storage] No saved network found under key "${key}".`, 'warn');
+        return false;
+      }
+      return this.importTopologyJSON(raw);
+    } catch (err) {
+      this.addLog(`[Storage] Failed to load from localStorage: ${String(err)}`, 'error');
+      return false;
+    }
+  }
+
+  /**
+   * Exports full topology as JSON object
+   */
+  public exportTopologyJSON(scenarioTitle: string = 'Custom Multi-Mesh Network'): TopologyExportJSON {
+    return {
+      simulatorConfig: this.config,
+      submeshes: Array.from(this.submeshes.values()),
+      nodes: Array.from(this.nodes.values()),
+      links: this.links,
+      meta: {
+        exportedAt: new Date().toISOString(),
+        version: '1.0.0',
+        scenarioTitle,
+        authors: ['User Network Architect']
+      }
+    };
+  }
+
+  /**
+   * Imports full topology from JSON object or string
+   */
+  public importTopologyJSON(data: TopologyExportJSON | string): boolean {
+    try {
+      const parsed: TopologyExportJSON = typeof data === 'string' ? JSON.parse(data) : data;
+      if (!parsed || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.links) || !Array.isArray(parsed.submeshes)) {
+        this.addLog('[Builder] Invalid topology JSON schema.', 'error');
+        return false;
+      }
+
+      if (parsed.simulatorConfig) {
+        this.config = { ...this.config, ...parsed.simulatorConfig };
+      }
+
+      this.loadTopology(parsed.submeshes, parsed.nodes, parsed.links);
+      this.addLog(`[Builder] Successfully imported topology "${parsed.meta?.scenarioTitle || 'Network'}" with ${parsed.nodes.length} nodes.`, 'success');
+      return true;
+    } catch (err) {
+      this.addLog(`[Builder] Error importing JSON: ${String(err)}`, 'error');
+      return false;
+    }
   }
 
   private updateGatewayTelemetry() {
