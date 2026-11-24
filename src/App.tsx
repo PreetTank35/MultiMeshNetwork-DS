@@ -14,6 +14,7 @@ import { TopologyCanvas } from './components/canvas/TopologyCanvas';
 import { Isometric3DView } from './components/canvas/Isometric3DView';
 import { FloatingPlayerBar } from './components/hud/FloatingPlayerBar';
 import { NodeDrawer } from './components/hud/NodeDrawer';
+import { PathPickerHUD } from './components/hud/PathPickerHUD';
 import { PacketXRayModal } from './components/hud/PacketXRayModal';
 import { TelemetryView } from './components/views/TelemetryView';
 import { GuideView } from './components/views/GuideView';
@@ -37,6 +38,7 @@ export function App() {
   const [inspectedPacket, setInspectedPacket] = useState<Packet | null>(null);
   const [is3DMode, setIs3DMode] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
+  const [highlightedRoute, setHighlightedRoute] = useState<string[] | null>(null);
 
   useEffect(() => { loadTopology('smart_campus'); }, []);
 
@@ -157,6 +159,17 @@ export function App() {
               onTogglePlay={handleTogglePlay} onStepForward={handleStepForward} onChangeSpeed={handleChangeSpeed}
               onInjectPacket={handleInjectPacket} onToggle3D={() => setIs3DMode(!is3DMode)} onAddNode={handleAddNode} />
 
+            <PathPickerHUD
+              nodes={nodes}
+              links={links}
+              submeshes={submeshes}
+              selectedNodeId={selectedNodeId}
+              activeRoutePath={highlightedRoute}
+              onHighlightRoute={setHighlightedRoute}
+              onTransmitPacket={handleInjectPacket}
+              className="top-4 left-4"
+            />
+
             <NodeDrawer node={selectedNode} link={selectedLink} submeshes={submeshes} nodes={nodes}
               onClose={() => { setSelectedNodeId(null); setSelectedLinkId(null); }}
               onToggleKillNode={id => { engine.toggleKillNode(id); syncState(); }}
@@ -167,7 +180,7 @@ export function App() {
 
         {/* TAB 2: Packet X-Ray Studio */}
         {activeTab === 'studio' && (
-          <PacketStudioView nodes={nodes} submeshes={submeshes} activePackets={activePackets}
+          <PacketStudioView nodes={nodes} links={links} submeshes={submeshes} activePackets={activePackets}
             translationTraces={engine.translationTraces} onInjectPacket={handleInjectPacket} />
         )}
 

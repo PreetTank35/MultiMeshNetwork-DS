@@ -1,15 +1,73 @@
 /**
  * Core Wireless Mesh Routing Protocols
  * Implements AODV, OLSR, HWMP, and RPL routing matrices
+ * Plus Advanced Multi-Mesh Cross-Domain Auto-Pathfinding Pipeline
  */
 
 import { MeshNode, NetworkLink, ProtocolType, SubMeshDomain } from '../../types/simulator';
+import { calculateGatewayDelay } from './gateway';
 
 export interface RouteHopResult {
   nextHopId: string | null;
   totalCost: number;
   protocolUsed: ProtocolType;
   path: string[];
+}
+
+export interface RouteMetricWeights {
+  alpha: number; // Rate penalty factor: \alpha / Rate (Rate in Mbps)
+  beta: number;  // Hop penalty factor: \beta * hops
+  gamma: number; // Gateway delay penalty factor: \gamma * GatewayDelay (ms)
+}
+
+export const DEFAULT_ROUTE_WEIGHTS: RouteMetricWeights = {
+  alpha: 50.0,
+  beta: 1.0,
+  gamma: 0.2,
+};
+
+export interface RouteSegmentTrace {
+  segmentIndex: number;
+  fromNodeId: string;
+  fromNodeName: string;
+  toNodeId: string;
+  toNodeName: string;
+  type: 'intra_mesh' | 'gateway_transition' | 'destination_delivery';
+  submeshId: string;
+  submeshName: string;
+  protocol: ProtocolType;
+  bandwidthMbps: number;
+  distanceMeters: number;
+  snrDb: number;
+  lossRate: number;
+  hopDelayMs: number;
+  gatewayDelayMs: number;
+  isGateway: boolean;
+}
+
+export interface MultiMeshRouteResult {
+  sourceId: string;
+  destId: string;
+  found: boolean;
+  path: string[];
+  nodesTraversed: MeshNode[];
+  linksTraversed: NetworkLink[];
+  hops: number;
+  submeshesTraversed: SubMeshDomain[];
+  submeshIds: string[];
+  gatewaysTraversed: MeshNode[];
+  protocolsUsed: ProtocolType[];
+  metricCost: number; // explicit cost C = \sum (\alpha/Rate + \beta*Hops + \gamma*GatewayDelay)
+  estimatedLatencyMs: number; // estimated total latency in ms
+  bottleneckSnrDb: number; // minimum link SNR across the path
+  isCrossDomain: boolean;
+  costBreakdown: {
+    rateCost: number;
+    hopCost: number;
+    gatewayCost: number;
+  };
+  segmentTraces: RouteSegmentTrace[];
+  error?: string;
 }
 
 /**
@@ -268,8 +326,6 @@ export function resolveRplRoute(
   links: NetworkLink[],
   rootNodeId: string
 ): RouteHopResult {
-  // If destination is higher rank (upward routing toward root)
-  // or downward routing along DAG branches
   const path = calculateDijkstraPath(source.id, destination.id, nodes, links, source.submeshId);
   if (!path || path.length < 2) {
     return { nextHopId: null, totalCost: Infinity, protocolUsed: 'RPL', path: [] };
@@ -283,3 +339,316 @@ export function resolveRplRoute(
   };
 }
 
+/**
+ * Helper to find active link between two nodes
+ */
+export function findLinkBetween(
+  sourceId: string,
+  targetId: string,
+  links: NetworkLink[]
+): NetworkLink | null {
+  return links.find(
+    l => !l.isSevered && !l.isJammed &&
+      ((l.source === sourceId && l.target === targetId) ||
+       (l.source === targetId && l.target === sourceId))
+  ) || null;
+}
+
+/**
+ * =========================================================================
+ * Comprehensive Multi-Mesh Auto-Pathfinding Pipeline
+ * Computes multi-hop shortest paths across heterogeneous sub-meshes,
+ * MRMC boundary gateway transitions, and destination sub-mesh delivery.
+ *
+ * Explicit Path Metric Cost:
+ *   C = \sum (\alpha / Rate + \beta * Hops + \gamma * GatewayDelay)
+ * =========================================================================
+ */
+export function calculateMultiMeshRoute(
+  sourceId: string,
+  destId: string,
+  nodes: Map<string, MeshNode> | MeshNode[],
+  links: NetworkLink[],
+  submeshes: Map<string, SubMeshDomain> | SubMeshDomain[],
+  weights: RouteMetricWeights = DEFAULT_ROUTE_WEIGHTS
+): MultiMeshRouteResult {
+  // Normalize maps
+  const nodeMap = nodes instanceof Map ? nodes : new Map(nodes.map(n => [n.id, n]));
+  const submeshMap = submeshes instanceof Map ? submeshes : new Map(submeshes.map(s => [s.id, s]));
+
+  const sourceNode = nodeMap.get(sourceId);
+  const destNode = nodeMap.get(destId);
+
+  const failResult = (reason: string): MultiMeshRouteResult => ({
+    sourceId,
+    destId,
+    found: false,
+    path: [],
+    nodesTraversed: [],
+    linksTraversed: [],
+    hops: 0,
+    submeshesTraversed: [],
+    submeshIds: [],
+    gatewaysTraversed: [],
+    protocolsUsed: [],
+    metricCost: Infinity,
+    estimatedLatencyMs: 0,
+    bottleneckSnrDb: 0,
+    isCrossDomain: false,
+    costBreakdown: { rateCost: 0, hopCost: 0, gatewayCost: 0 },
+    segmentTraces: [],
+    error: reason,
+  });
+
+  if (!sourceNode) return failResult(`Source node "${sourceId}" not found in network topology`);
+  if (!destNode) return failResult(`Destination node "${destId}" not found in network topology`);
+  if (!sourceNode.isAlive) return failResult(`Source node "${sourceNode.name}" is offline / decommissioned`);
+  if (!destNode.isAlive) return failResult(`Destination node "${destNode.name}" is offline / decommissioned`);
+
+  // Identical source and destination
+  if (sourceId === destId) {
+    const sm = submeshMap.get(sourceNode.submeshId);
+    return {
+      sourceId,
+      destId,
+      found: true,
+      path: [sourceId],
+      nodesTraversed: [sourceNode],
+      linksTraversed: [],
+      hops: 0,
+      submeshesTraversed: sm ? [sm] : [],
+      submeshIds: sm ? [sm.id] : [],
+      gatewaysTraversed: [],
+      protocolsUsed: sm ? [sm.protocol] : [],
+      metricCost: 0,
+      estimatedLatencyMs: 0,
+      bottleneckSnrDb: 100,
+      isCrossDomain: false,
+      costBreakdown: { rateCost: 0, hopCost: 0, gatewayCost: 0 },
+      segmentTraces: [],
+    };
+  }
+
+  // Build full multi-mesh weighted adjacency graph
+  const adj = new Map<string, Array<{ target: string; link: NetworkLink; weight: number; isGatewayHop: boolean }>>();
+
+  for (const node of nodeMap.values()) {
+    if (node.isAlive) adj.set(node.id, []);
+  }
+
+  for (const link of links) {
+    if (link.isSevered || link.isJammed) continue;
+    const u = nodeMap.get(link.source);
+    const v = nodeMap.get(link.target);
+    if (!u || !v || !u.isAlive || !v.isAlive) continue;
+
+    const rate = Math.max(link.bandwidthMbps, 0.5);
+    const rateCost = weights.alpha / rate;
+    const hopCost = weights.beta * 1.0;
+    const lossPenalty = 3.0 * Math.max(link.lossRate, 0) + (1 / Math.max(1 - link.lossRate, 0.05) - 1);
+
+    // Cross-domain or gateway boundary detection
+    const isCrossDomainHop = u.submeshId !== v.submeshId;
+    const isGatewayHop = u.type === 'gateway' || v.type === 'gateway' || isCrossDomainHop;
+
+    let gatewayDelayMs = 0;
+    if (isGatewayHop && isCrossDomainHop) {
+      const uSm = submeshMap.get(u.submeshId);
+      const vSm = submeshMap.get(v.submeshId);
+      gatewayDelayMs = calculateGatewayDelay(u.type === 'gateway' ? u : v, uSm, vSm);
+    }
+    const gatewayCost = weights.gamma * gatewayDelayMs;
+
+    // Protocol Airtime & DAG adjustments
+    const uSm = submeshMap.get(u.submeshId);
+    let protoModifier = 1.0;
+    if (uSm?.protocol === 'HWMP') {
+      // Airtime Link Metric factor: ALM overhead
+      protoModifier = 1.15;
+    } else if (uSm?.protocol === 'RPL') {
+      // RPL low-power links prioritize high SNR
+      if (link.snrDb < 15) protoModifier = 1.5;
+    }
+
+    const weight = (rateCost + hopCost + lossPenalty + gatewayCost) * protoModifier;
+
+    adj.get(u.id)?.push({ target: v.id, link, weight, isGatewayHop });
+    adj.get(v.id)?.push({ target: u.id, link, weight, isGatewayHop });
+  }
+
+  // Dijkstra multi-mesh shortest path
+  const dist = new Map<string, number>();
+  const prev = new Map<string, string | null>();
+  const pq: PQItem[] = [];
+
+  for (const nodeId of adj.keys()) {
+    dist.set(nodeId, Infinity);
+    prev.set(nodeId, null);
+  }
+
+  dist.set(sourceId, 0);
+  pq.push({ nodeId: sourceId, cost: 0 });
+
+  while (pq.length > 0) {
+    pq.sort((a, b) => a.cost - b.cost);
+    const curr = pq.shift()!;
+
+    if (curr.nodeId === destId) break;
+    if (curr.cost > (dist.get(curr.nodeId) ?? Infinity)) continue;
+
+    const neighbors = adj.get(curr.nodeId) || [];
+    for (const edge of neighbors) {
+      const alt = curr.cost + edge.weight;
+      if (alt < (dist.get(edge.target) ?? Infinity)) {
+        dist.set(edge.target, alt);
+        prev.set(edge.target, curr.nodeId);
+        pq.push({ nodeId: edge.target, cost: alt });
+      }
+    }
+  }
+
+  if (!prev.has(destId) || dist.get(destId) === Infinity) {
+    return failResult(`No viable multi-mesh path found between "${sourceNode.name}" and "${destNode.name}". Check link status or gateway boundaries.`);
+  }
+
+  // Reconstruct path
+  const path: string[] = [];
+  let current: string | null = destId;
+  while (current !== null) {
+    path.unshift(current);
+    current = prev.get(current) ?? null;
+  }
+
+  if (path[0] !== sourceId) {
+    return failResult(`Discontinuous routing tree between "${sourceNode.name}" and "${destNode.name}"`);
+  }
+
+  // Extract detailed path metrics, segment traces, and cost breakdown
+  const nodesTraversed: MeshNode[] = path.map(id => nodeMap.get(id)!);
+  const linksTraversed: NetworkLink[] = [];
+  const segmentTraces: RouteSegmentTrace[] = [];
+  const submeshIdSet = new Set<string>();
+  const gatewaySet = new Set<string>();
+  const protocolsUsedSet = new Set<ProtocolType>();
+
+  let sumRateCost = 0;
+  let sumGatewayCost = 0;
+  let totalLatencyMs = 0;
+  let bottleneckSnr = Infinity;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const fromN = nodesTraversed[i];
+    const toN = nodesTraversed[i + 1];
+    const link = findLinkBetween(fromN.id, toN.id, links);
+
+    if (link) {
+      linksTraversed.push(link);
+      bottleneckSnr = Math.min(bottleneckSnr, link.snrDb);
+    }
+
+    const fromSm = submeshMap.get(fromN.submeshId);
+    const toSm = submeshMap.get(toN.submeshId);
+
+    if (fromSm) {
+      submeshIdSet.add(fromSm.id);
+      protocolsUsedSet.add(fromSm.protocol);
+    }
+    if (toSm) {
+      submeshIdSet.add(toSm.id);
+      protocolsUsedSet.add(toSm.protocol);
+    }
+
+    const bw = link?.bandwidthMbps || 54;
+    const distM = link?.distanceMeters || 15;
+    const snr = link?.snrDb || 25;
+    const loss = link?.lossRate || 0.01;
+
+    // Rate cost component: \alpha / Rate
+    sumRateCost += weights.alpha / Math.max(bw, 0.5);
+
+    // Hop transmission delays
+    const txDelayMs = ((512 * 8) / (bw * 1e6)) * 1000;
+    const propDelayMs = (distM / 3e8) * 1000;
+    const queueDelayMs = Math.min((fromN.currentQueue?.length || 0) * 1.5 + 4.0, 30);
+    const hopDelayMs = Math.max(txDelayMs + propDelayMs + queueDelayMs, 8.0);
+
+    // Gateway transition check
+    const isGw = fromN.type === 'gateway' || toN.type === 'gateway';
+    const isDomainChange = fromN.submeshId !== toN.submeshId;
+    let gatewayDelayMs = 0;
+
+    if (isGw && isDomainChange) {
+      const gwNode = fromN.type === 'gateway' ? fromN : toN;
+      gatewaySet.add(gwNode.id);
+      gatewayDelayMs = calculateGatewayDelay(gwNode, fromSm, toSm);
+      sumGatewayCost += weights.gamma * gatewayDelayMs;
+    }
+
+    totalLatencyMs += hopDelayMs + gatewayDelayMs;
+
+    // Determine segment type
+    let segmentType: 'intra_mesh' | 'gateway_transition' | 'destination_delivery' = 'intra_mesh';
+    if (isDomainChange || isGw) {
+      segmentType = 'gateway_transition';
+    } else if (i === path.length - 2) {
+      segmentType = 'destination_delivery';
+    }
+
+    segmentTraces.push({
+      segmentIndex: i + 1,
+      fromNodeId: fromN.id,
+      fromNodeName: fromN.name,
+      toNodeId: toN.id,
+      toNodeName: toN.name,
+      type: segmentType,
+      submeshId: fromSm?.id || fromN.submeshId,
+      submeshName: fromSm?.name || fromN.submeshId,
+      protocol: fromSm?.protocol || 'HWMP',
+      bandwidthMbps: bw,
+      distanceMeters: Math.round(distM * 10) / 10,
+      snrDb: Math.round(snr * 10) / 10,
+      lossRate: Math.round(loss * 1000) / 10,
+      hopDelayMs: Math.round(hopDelayMs * 10) / 10,
+      gatewayDelayMs: Math.round(gatewayDelayMs * 10) / 10,
+      isGateway: isGw,
+    });
+  }
+
+  const hops = path.length - 1;
+  const sumHopCost = weights.beta * hops;
+  const metricCost = Math.round((sumRateCost + sumHopCost + sumGatewayCost) * 100) / 100;
+  const estimatedLatencyMs = Math.round(totalLatencyMs * 10) / 10;
+  const bottleneckSnrDb = bottleneckSnr === Infinity ? 0 : Math.round(bottleneckSnr * 10) / 10;
+
+  const submeshesTraversed: SubMeshDomain[] = Array.from(submeshIdSet)
+    .map(id => submeshMap.get(id))
+    .filter((s): s is SubMeshDomain => !!s);
+
+  const gatewaysTraversed: MeshNode[] = Array.from(gatewaySet)
+    .map(id => nodeMap.get(id))
+    .filter((g): g is MeshNode => !!g);
+
+  return {
+    sourceId,
+    destId,
+    found: true,
+    path,
+    nodesTraversed,
+    linksTraversed,
+    hops,
+    submeshesTraversed,
+    submeshIds: Array.from(submeshIdSet),
+    gatewaysTraversed,
+    protocolsUsed: Array.from(protocolsUsedSet),
+    metricCost,
+    estimatedLatencyMs,
+    bottleneckSnrDb,
+    isCrossDomain: submeshIdSet.size > 1,
+    costBreakdown: {
+      rateCost: Math.round(sumRateCost * 100) / 100,
+      hopCost: Math.round(sumHopCost * 100) / 100,
+      gatewayCost: Math.round(sumGatewayCost * 100) / 100,
+    },
+    segmentTraces,
+  };
+}
