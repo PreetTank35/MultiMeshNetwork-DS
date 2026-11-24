@@ -4,10 +4,11 @@
  */
 
 export type ProtocolType = 'AODV' | 'OLSR' | 'HWMP' | 'RPL';
-export type FrequencyBand = '2.4GHz' | '5.2GHz' | '5.8GHz' | '915MHz';
+export type FrequencyBand = '2.4GHz' | '5.2GHz' | '5.8GHz' | '915MHz' | '868MHz';
 export type NodeType = 'router' | 'gateway' | 'sensor' | 'mobile';
 export type MobilityModel = 'static' | 'random_waypoint' | 'linear';
 export type InterfaceType = 'wifi' | 'zigbee' | 'thread' | 'ethernet';
+export type BuilderTool = 'select' | 'connect_link' | 'add_router' | 'add_gateway' | 'add_sensor' | 'add_mobile';
 
 export interface NetworkInterface {
   id: string;
