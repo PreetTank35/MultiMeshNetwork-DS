@@ -59,6 +59,7 @@ interface Props {
   onSelectLink: (id: string | null) => void;
   onMoveNode: (id: string, x: number, y: number) => void;
   activeBlueprintId?: string;
+  highlightedRoute?: string[] | null;
 }
 
 export const TopologyCanvas: React.FC<Props> = ({
@@ -71,7 +72,8 @@ export const TopologyCanvas: React.FC<Props> = ({
   onSelectNode,
   onSelectLink,
   onMoveNode,
-  activeBlueprintId = 'campus_academic_wing'
+  activeBlueprintId = 'campus_academic_wing',
+  highlightedRoute
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -241,6 +243,12 @@ export const TopologyCanvas: React.FC<Props> = ({
           const p2 = p.pathTraversed[p.pathTraversed.length - 1];
           s.add(`${p1}|${p2}`);
           s.add(`${p2}|${p1}`);
+        }
+      }
+      if (highlightedRoute && highlightedRoute.length > 1) {
+        for (let i = 0; i < highlightedRoute.length - 1; i++) {
+          s.add(`${highlightedRoute[i]}|${highlightedRoute[i + 1]}`);
+          s.add(`${highlightedRoute[i + 1]}|${highlightedRoute[i]}`);
         }
       }
       return s;

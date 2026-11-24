@@ -283,6 +283,7 @@ export function App() {
             ) : (
               <TopologyCanvas nodes={nodes} links={links} submeshes={submeshes} activePackets={activePackets}
                 selectedNodeId={selectedNodeId} selectedLinkId={selectedLinkId}
+                highlightedRoute={highlightedRoute}
                 onSelectNode={id => {
                   if (activeTool === 'connect_link' && id) {
                     if (!connectSourceId) {
