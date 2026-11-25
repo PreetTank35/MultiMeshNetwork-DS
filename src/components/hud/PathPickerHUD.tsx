@@ -3,7 +3,7 @@
  * Anchored statically at top-[80px] left-4; never shifts or changes size with canvas zoom or mesh growth.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Route,
   ArrowRight,
@@ -19,6 +19,7 @@ import {
   Send,
   Minimize2,
   Maximize2,
+  Square,
 } from 'lucide-react';
 import { MeshNode, NetworkLink, SubMeshDomain } from '../../types/simulator';
 import { calculateMultiMeshRoute, MultiMeshRouteResult } from '../../core/protocols/routing';
@@ -31,6 +32,9 @@ interface Props {
   activeRoutePath?: string[] | null;
   onHighlightRoute?: (path: string[] | null) => void;
   onTransmitPacket?: (sourceId: string, destId: string, payload: string) => void;
+  activeTransfer: { sourceId: string; destId: string; packetsSent: number } | null;
+  onStartContinuousTransfer: (sourceId: string, destId: string, payload: string) => void;
+  onStopContinuousTransfer: () => void;
   className?: string;
 }
 
@@ -41,6 +45,9 @@ export const PathPickerHUD: React.FC<Props> = ({
   selectedNodeId,
   onHighlightRoute,
   onTransmitPacket,
+  activeTransfer,
+  onStartContinuousTransfer,
+  onStopContinuousTransfer,
   className = '',
 }) => {
   const [sourceId, setSourceId] = useState<string>('');
@@ -52,6 +59,15 @@ export const PathPickerHUD: React.FC<Props> = ({
   const [transmissionFeedback, setTransmissionFeedback] = useState<string | null>(null);
 
   const aliveNodes = useMemo(() => nodes.filter(n => n.isAlive), [nodes]);
+  const nodeSetKey = useMemo(() => nodes.map(node => node.id).join('|'), [nodes]);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const routeTopologyKey = [
+    nodes.map(node => `${node.id}:${node.isAlive ? 'a' : 'x'}`).sort().join(','),
+    links
+      .map(link => `${link.id}:${link.source}:${link.target}:${link.isSevered ? 's' : ''}${link.isJammed ? 'j' : ''}${link.isViable === false ? 'v' : ''}`)
+      .sort()
+      .join(','),
+  ].join('|');
 
   useEffect(() => {
     if ((!sourceId || !aliveNodes.some(n => n.id === sourceId)) && aliveNodes.length > 0) {
@@ -62,6 +78,17 @@ export const PathPickerHUD: React.FC<Props> = ({
       setDestId(otherSubmeshNode ? otherSubmeshNode.id : aliveNodes[aliveNodes.length - 1].id);
     }
   }, [aliveNodes]);
+
+  useEffect(() => {
+    if (!routeResult && !activeTransfer) return;
+    const result = calculateMultiMeshRoute(sourceId, destId, nodes, links, submeshes);
+    setRouteResult(result);
+    if (onHighlightRoute) onHighlightRoute(result.found ? result.path : null);
+  }, [routeTopologyKey]);
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [nodeSetKey]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -94,6 +121,18 @@ export const PathPickerHUD: React.FC<Props> = ({
     onTransmitPacket(sourceId, destId, payloadType);
     setTransmissionFeedback(`Dispatched ${payloadType.split(' ')[0]} frame`);
     setTimeout(() => setTransmissionFeedback(null), 2800);
+  };
+
+  const handleStartContinuousTransfer = () => {
+    if (!sourceId || !destId || sourceId === destId) return;
+    const result = calculateMultiMeshRoute(sourceId, destId, nodes, links, submeshes);
+    setRouteResult(result);
+    if (!result.found) {
+      if (onHighlightRoute) onHighlightRoute(null);
+      return;
+    }
+    if (onHighlightRoute) onHighlightRoute(result.path);
+    onStartContinuousTransfer(sourceId, destId, payloadType);
   };
 
   const getSubmeshForNode = (nodeId: string) => {
@@ -144,7 +183,7 @@ export const PathPickerHUD: React.FC<Props> = ({
 
         {/* Content Body — Static fixed scroll ceiling */}
         {!isMinimized && (
-          <div className="p-4 space-y-3.5 max-h-[calc(100vh-240px)] overflow-y-auto custom-scrollbar">
+          <div ref={contentRef} className="p-4 space-y-3.5 max-h-[calc(100vh-360px)] overflow-y-auto custom-scrollbar">
             {/* Source Selector */}
             <div>
               <div className="flex items-center justify-between text-[11px] text-neu-muted uppercase tracking-wider mb-1.5 font-bold">
@@ -160,6 +199,7 @@ export const PathPickerHUD: React.FC<Props> = ({
               </div>
               <select
                 value={sourceId}
+                disabled={!!activeTransfer}
                 onChange={e => { setSourceId(e.target.value); setRouteResult(null); }}
                 className="w-full neu-select rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
               >
@@ -179,6 +219,7 @@ export const PathPickerHUD: React.FC<Props> = ({
             <div className="flex items-center justify-center -my-1 relative z-10">
               <button
                 onClick={handleSwap}
+                disabled={!!activeTransfer}
                 title="Swap Source and Destination"
                 className="p-2 rounded-full neu-button-sm text-neu-muted hover:text-neu-text"
               >
@@ -201,6 +242,7 @@ export const PathPickerHUD: React.FC<Props> = ({
               </div>
               <select
                 value={destId}
+                disabled={!!activeTransfer}
                 onChange={e => { setDestId(e.target.value); setRouteResult(null); }}
                 className="w-full neu-select rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
               >
@@ -330,6 +372,7 @@ export const PathPickerHUD: React.FC<Props> = ({
                 <div className="pt-2.5 border-t border-neu-border space-y-2.5">
                   <select
                     value={payloadType}
+                    disabled={!!activeTransfer}
                     onChange={e => setPayloadType(e.target.value)}
                     className="w-full neu-select rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
                   >
@@ -346,6 +389,31 @@ export const PathPickerHUD: React.FC<Props> = ({
                     <Send className="w-4 h-4" />
                     <span>Transmit Packet</span>
                   </button>
+
+                  {activeTransfer ? (
+                    <div className="space-y-2">
+                      <div className="p-2 rounded-xl neu-pressed text-[11px] font-mono text-emerald-600 dark:text-emerald-400 text-center">
+                        Streaming {activeTransfer.packetsSent} packets · 1 packet / sim second
+                        <span className="block mt-1 text-neu-muted">Click a canvas link to cut it; click again to restore it.</span>
+                      </div>
+                      <button
+                        onClick={onStopContinuousTransfer}
+                        className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-[13px] transition-all flex items-center justify-center space-x-2 shadow-md"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                        <span>Stop Data Transfer</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      disabled={!sourceId || !destId || sourceId === destId}
+                      onClick={handleStartContinuousTransfer}
+                      className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-[13px] transition-all flex items-center justify-center space-x-2 shadow-md disabled:opacity-40"
+                    >
+                      <Radio className="w-4 h-4" />
+                      <span>Start Continuous Transfer</span>
+                    </button>
+                  )}
 
                   {transmissionFeedback && (
                     <div className="p-2 rounded-xl neu-pressed text-emerald-600 dark:text-emerald-400 text-[11px] font-mono flex items-center justify-center space-x-1.5 animate-fade-up">

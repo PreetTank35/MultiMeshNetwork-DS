@@ -12,6 +12,7 @@ import {
   Activity,
   Sun,
   Moon,
+  Building2,
 } from 'lucide-react';
 
 export type ViewTab = 'canvas' | 'studio' | 'telemetry' | 'guide';
@@ -19,7 +20,7 @@ export type ViewTab = 'canvas' | 'studio' | 'telemetry' | 'guide';
 interface Props {
   activeTab: ViewTab;
   onChangeTab: (tab: ViewTab) => void;
-  onLoadScenario: (s: 'smart_campus' | 'smart_logistics' | 'monolithic') => void;
+  onLoadScenario: (s: 'smart_campus' | 'smart_logistics' | 'monolithic' | 'citywide') => void;
   isPresentationMode: boolean;
   onTogglePresentationMode: () => void;
   isDarkTheme: boolean;
@@ -86,6 +87,24 @@ export const TopNavbar: React.FC<Props> = ({
                 <span>Select Blueprint Topology</span>
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
               </div>
+
+              <button
+                onClick={() => { onLoadScenario('citywide'); setScenarioOpen(false); }}
+                className="w-full text-left p-3 rounded-xl mt-1 hover:neu-pressed transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-[13px] text-neu-text group-hover:text-violet-600 dark:group-hover:text-violet-300 flex items-center space-x-2">
+                    <Building2 className="w-4 h-4 text-violet-500" />
+                    <span>Connected City A + City B</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md neu-pressed-sm text-violet-600 dark:text-violet-300 font-mono font-bold">
+                    2 GATEWAYS
+                  </span>
+                </div>
+                <div className="text-[11px] text-neu-muted mt-1 pl-4 leading-relaxed">
+                  Two independent urban meshes with redundant, dual-radio intercity gateways
+                </div>
+              </button>
 
               <button
                 onClick={() => { onLoadScenario('smart_campus'); setScenarioOpen(false); }}

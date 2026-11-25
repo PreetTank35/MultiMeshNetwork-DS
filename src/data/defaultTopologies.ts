@@ -1069,3 +1069,241 @@ export function getMonolithicMeshTopology(): TopologyExportJSON {
     },
   };
 }
+
+// ============================================================================
+// SCENARIO 4: Dense Smart City Mesh with redundant street-level backhaul
+// ============================================================================
+export function getCitywideMeshTopology(): TopologyExportJSON {
+  const submeshes: SubMeshDomain[] = [
+    {
+      id: 'mesh_city_a',
+      name: 'City A Urban Mesh',
+      protocol: 'HWMP',
+      technology: 'Wi-Fi 6',
+      defaultBandwidthMbps: 300,
+      frequencyBand: '5.2GHz',
+      channelWidthMhz: 40,
+      channelNumber: 44,
+      color: '#8B5CF6',
+      description: 'City A street mesh for civic services, sensors, and neighborhood infrastructure',
+    },
+    {
+      id: 'mesh_city_b',
+      name: 'City B Urban Mesh',
+      protocol: 'OLSR',
+      technology: '802.11s',
+      defaultBandwidthMbps: 220,
+      frequencyBand: '5.8GHz',
+      channelWidthMhz: 40,
+      channelNumber: 149,
+      color: '#06B6D4',
+      description: 'City B street mesh with an independent routing domain and redundant intercity gateway links',
+    },
+  ];
+  const nodes: MeshNode[] = [];
+  const links: NetworkLink[] = [];
+  const submeshMap = new Map(submeshes.map(submesh => [submesh.id, submesh]));
+  const citySpecs = [
+    { key: 'city_a', label: 'A', name: 'City A', submeshId: 'mesh_city_a', xOffset: 0 },
+    { key: 'city_b', label: 'B', name: 'City B', submeshId: 'mesh_city_b', xOffset: 1050 },
+  ];
+  const cityByKey = new Map(citySpecs.map(city => [city.key, city]));
+  const cityBlocks = new Map<string, MeshNode>();
+
+  const createNode = (
+    cityKey: string,
+    id: string,
+    name: string,
+    type: MeshNode['type'],
+    x: number,
+    y: number,
+    mobilityModel: MeshNode['mobilityModel'] = 'static'
+  ): MeshNode => {
+    const city = cityByKey.get(cityKey)!;
+    const primarySubmesh = submeshMap.get(city.submeshId)!;
+    const macPrefix = nodes.length.toString(16).padStart(2, '0');
+    const interfaceFor = (submeshId: string, interfaceIndex: number) => {
+      const domain = submeshMap.get(submeshId)!;
+      return {
+        id: `if_${id}_${interfaceIndex}`,
+        type: 'wifi' as const,
+        mac: `00:1A:2B:CC:${macPrefix}:${interfaceIndex.toString(16).padStart(2, '0')}`,
+        channel: domain.channelNumber,
+        frequencyBand: domain.frequencyBand,
+        txPowerDbm: type === 'gateway' ? 24 : 20,
+        bandwidthMbps: domain.defaultBandwidthMbps || 54,
+        submeshId: domain.id,
+        technology: domain.technology,
+        receiverSensitivityDbm: -90,
+        isUp: true,
+      };
+    };
+    const interfaces = [interfaceFor(primarySubmesh.id, 0)];
+    if (type === 'gateway') interfaces.push(interfaceFor('mesh_city_b', 1));
+
+    return {
+      id,
+      name,
+      submeshId: primarySubmesh.id,
+      type,
+      position: { x, y },
+      mobilityModel,
+      txPowerDbm: type === 'gateway' ? 24 : 20,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: type === 'gateway',
+      queueCapacity: type === 'gateway' ? 128 : 64,
+      currentQueue: [],
+      isAlive: true,
+      interfaces,
+      routingTable: {},
+    };
+  };
+
+  const addLink = (source: MeshNode, target: MeshNode, radioSubmeshId?: string) => {
+    const linkSubmeshId = radioSubmeshId ||
+      (source.submeshId === target.submeshId
+        ? source.submeshId
+        : source.type === 'gateway'
+        ? target.submeshId
+        : source.submeshId);
+    const domain = submeshMap.get(linkSubmeshId)!;
+    const distanceMeters = Math.hypot(
+      source.position.x - target.position.x,
+      source.position.y - target.position.y
+    ) / 12;
+    links.push({
+      id: `city_${source.id}_${target.id}`,
+      source: source.id,
+      target: target.id,
+      bandwidthMbps: domain.defaultBandwidthMbps || 54,
+      lossRate: domain.id === 'mesh_city_a' ? 0.015 : 0.02,
+      distanceMeters,
+      snrDb: domain.id === 'mesh_city_a' ? 28 : 25,
+      per: domain.id === 'mesh_city_a' ? 0.015 : 0.02,
+      isSevered: false,
+      isJammed: false,
+      currentLoad: 0,
+      traversalCount: 0,
+      frequencyBand: domain.frequencyBand,
+      channel: domain.channelNumber,
+    });
+  };
+
+  const neighborhoodNames = ['Old Town', 'Civic Center', 'Market Square', 'Riverside', 'East Park', 'Hill District'];
+  const blockAt = (cityKey: string, row: number, col: number) =>
+    cityBlocks.get(`${cityKey}_${row}_${col}`)!;
+
+  for (const city of citySpecs) {
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 6; col++) {
+        const id = `${city.key}_block_${row}_${col}`;
+        const node = createNode(
+          city.key,
+          id,
+          `${city.label}: ${neighborhoodNames[col]} R${row + 1}`,
+          'router',
+          city.xOffset + 110 + col * 128,
+          70 + row * 82
+        );
+        nodes.push(node);
+        cityBlocks.set(`${city.key}_${row}_${col}`, node);
+      }
+    }
+
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 6; col++) {
+        if (col < 5) addLink(blockAt(city.key, row, col), blockAt(city.key, row, col + 1));
+        if (row < 4) addLink(blockAt(city.key, row, col), blockAt(city.key, row + 1, col));
+        if (row < 4 && col < 5) {
+          addLink(blockAt(city.key, row, col), blockAt(city.key, row + 1, col + 1));
+          if ((row + col) % 2 === 0) {
+            addLink(blockAt(city.key, row, col + 1), blockAt(city.key, row + 1, col));
+          }
+        }
+      }
+    }
+
+    const civicServices = [
+      { id: 'sensor_air', name: 'Air Quality', type: 'sensor' as const, x: 82, y: 110 },
+      { id: 'sensor_traffic', name: 'Traffic Hub', type: 'end_device' as const, x: 855, y: 145 },
+      { id: 'sensor_water', name: 'Waterworks', type: 'sensor' as const, x: 175, y: 465 },
+      { id: 'station_emergency', name: 'Emergency Dispatch', type: 'end_device' as const, x: 495, y: 38 },
+      { id: 'sensor_grid', name: 'Power Grid', type: 'sensor' as const, x: 850, y: 400 },
+      { id: 'station_transit', name: 'Transit Exchange', type: 'end_device' as const, x: 500, y: 465 },
+      { id: 'sensor_flood', name: 'Flood Sensor', type: 'sensor' as const, x: 80, y: 400 },
+      { id: 'station_server', name: 'Data Center', type: 'router' as const, x: 870, y: 270 },
+    ];
+
+    for (const service of civicServices) {
+      const node = createNode(
+        city.key,
+        `${city.key}_${service.id}`,
+        `${city.label}: ${service.name}`,
+        service.type,
+        city.xOffset + service.x,
+        service.y
+      );
+      nodes.push(node);
+      const nearestBlock = Array.from({ length: 30 }, (_, index) =>
+        blockAt(city.key, Math.floor(index / 6), index % 6)
+      ).sort((a, b) =>
+        Math.hypot(a.position.x - node.position.x, a.position.y - node.position.y) -
+        Math.hypot(b.position.x - node.position.x, b.position.y - node.position.y)
+      )[0];
+      if (nearestBlock) addLink(node, nearestBlock);
+    }
+  }
+
+  const bridgeGateways = [
+    { suffix: 'west', x: 960, y: 152, rows: [1, 2] },
+    { suffix: 'east', x: 960, y: 398, rows: [3, 4] },
+  ];
+  for (const bridge of bridgeGateways) {
+    const gateway = createNode(
+      'city_a',
+      `city_a_gateway_${bridge.suffix}`,
+      `Intercity Gateway ${bridge.suffix === 'west' ? 'West' : 'East'}`,
+      'gateway',
+      bridge.x,
+      bridge.y
+    );
+    nodes.push(gateway);
+    for (const row of bridge.rows) {
+      addLink(gateway, blockAt('city_a', row, 5), 'mesh_city_a');
+      addLink(gateway, blockAt('city_b', row, 0), 'mesh_city_b');
+    }
+  }
+  addLink(
+    nodes.find(node => node.id === 'city_a_gateway_west')!,
+    nodes.find(node => node.id === 'city_a_gateway_east')!,
+    'mesh_city_a'
+  );
+
+  return {
+    simulatorConfig: {
+      tickRateMs: 50,
+      simSpeedMultiplier: 1.0,
+      pathLossModel: 'LogDistance',
+      pathLossExponent: 2.7,
+      shadowingStdDevDb: 3.0,
+      referenceDistanceMeters: 1.0,
+      noiseFloorDbm: -95,
+      carrierFreqGhz: 5.2,
+      seed: 42024,
+      fixedStepMs: 20,
+      rxSensitivityDbm: -90,
+      enableInterference: true,
+      enableCollisions: true,
+      defaultTtl: 40,
+    },
+    submeshes,
+    nodes,
+    links,
+    meta: {
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      version: '2.0.0',
+      scenarioTitle: 'Connected City A and City B Multi-Mesh Network',
+      authors: ['Preet Tank', 'Tejas Waghmode', 'Vansh Thakre'],
+    },
+  };
+}

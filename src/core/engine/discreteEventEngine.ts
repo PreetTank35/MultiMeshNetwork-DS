@@ -984,6 +984,47 @@ export class DiscreteEventEngine {
     };
   }
 
+  private retryPacketsFromFailedLink(link: NetworkLink, timestampMs: number) {
+    for (const packet of this.activePackets.values()) {
+      if (packet.state !== 'transmitting' || packet.currentLinkId !== link.id) continue;
+
+      link.currentLoad = Math.max(0, link.currentLoad - 1);
+      packet.state = 'queued';
+      packet.currentLinkId = undefined;
+      packet.nextHop = undefined;
+      packet.lastHopStartedAtMs = undefined;
+      packet.lastHopDurationMs = undefined;
+      this.scheduleEvent({
+        id: `EV-RETRY-${packet.id}-${timestampMs}`,
+        timestamp: timestampMs,
+        type: 'PacketQueued',
+        data: { packetId: packet.id, nodeId: packet.currentHop },
+      });
+    }
+  }
+
+  private retryPacketsFromFailedNextHop(nodeId: string, timestampMs: number) {
+    for (const packet of this.activePackets.values()) {
+      if (packet.state !== 'transmitting' || packet.nextHop !== nodeId) continue;
+
+      const link = packet.currentLinkId
+        ? this.links.find(candidate => candidate.id === packet.currentLinkId)
+        : undefined;
+      if (link) link.currentLoad = Math.max(0, link.currentLoad - 1);
+      packet.state = 'queued';
+      packet.currentLinkId = undefined;
+      packet.nextHop = undefined;
+      packet.lastHopStartedAtMs = undefined;
+      packet.lastHopDurationMs = undefined;
+      this.scheduleEvent({
+        id: `EV-RETRY-${packet.id}-${timestampMs}`,
+        timestamp: timestampMs,
+        type: 'PacketQueued',
+        data: { packetId: packet.id, nodeId: packet.currentHop },
+      });
+    }
+  }
+
   private handlePacketQueued(packetId: string, nodeId: string, timestampMs: number) {
     const packet = this.activePackets.get(packetId);
     if (!packet || isPacketTerminalState(packet.state)) return;
@@ -1333,12 +1374,17 @@ export class DiscreteEventEngine {
     timestampMs: number
   ) {
     const link = this.links.find(l => l.id === linkId) || this.findLink(fromNodeId, toNodeId);
+    const packet = this.activePackets.get(packetId);
+    if (!packet || isPacketTerminalState(packet.state)) return;
+    if (
+      packet.state !== 'transmitting' ||
+      packet.currentLinkId !== linkId ||
+      packet.currentHop !== fromNodeId ||
+      packet.nextHop !== toNodeId
+    ) return;
     if (link) {
       link.currentLoad = Math.max(0, link.currentLoad - 1);
     }
-
-    const packet = this.activePackets.get(packetId);
-    if (!packet || isPacketTerminalState(packet.state)) return;
 
     const fromNode = this.nodes.get(fromNodeId);
     const toNode = this.nodes.get(toNodeId);
@@ -1642,6 +1688,13 @@ export class DiscreteEventEngine {
     );
   }
 
+  public cancelPacket(packetId: string, reason: string = 'Transfer stopped by user'): boolean {
+    const packet = this.activePackets.get(packetId);
+    if (!packet || isPacketTerminalState(packet.state)) return false;
+    this.handlePacketDrop(packetId, reason, this.simTimeMs);
+    return true;
+  }
+
   private handlePacketDrop(packetId: string, reason: string, timestampMs: number) {
     const packet = this.activePackets.get(packetId);
     if (!packet || isPacketTerminalState(packet.state)) return;
@@ -1702,6 +1755,7 @@ export class DiscreteEventEngine {
 
   private classifyDropReason(reason: string): string {
     const r = reason.toLowerCase();
+    if (r.includes('transfer stopped by user')) return 'User Cancelled';
     if (r.includes('ttl')) return 'TTL Expired';
     if (r.includes('queue overflow')) return 'Queue Overflow';
     if (r.includes('jam')) return 'Channel Jammed';
@@ -1901,6 +1955,7 @@ export class DiscreteEventEngine {
         type: 'NodeFailed',
         data: { nodeId },
       });
+      this.retryPacketsFromFailedNextHop(nodeId, this.simTimeMs);
     }
 
     invalidateAodvRoutes(this.nodes, nodeId);
@@ -1939,6 +1994,7 @@ export class DiscreteEventEngine {
         type: 'LinkFailed',
         data: { linkId, source: link.source, target: link.target },
       });
+      this.retryPacketsFromFailedLink(link, this.simTimeMs);
     } else {
       this.faults.severedLinks.delete(linkId);
       this.recordEvent({

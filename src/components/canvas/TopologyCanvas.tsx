@@ -48,6 +48,8 @@ interface Props {
   onSelectNode: (id: string | null) => void;
   onSelectLink: (id: string | null) => void;
   onMoveNode: (id: string, x: number, y: number) => void;
+  isTransferActive: boolean;
+  onToggleLinkFailure: (id: string) => void;
   activeBlueprintId?: string;
   highlightedRoute?: string[] | null;
   isDarkTheme?: boolean;
@@ -64,12 +66,17 @@ export const TopologyCanvas: React.FC<Props> = ({
   onSelectNode,
   onSelectLink,
   onMoveNode,
+  isTransferActive,
+  onToggleLinkFailure,
   activeBlueprintId = 'campus_academic_wing',
   highlightedRoute,
   isDarkTheme = false,
   isPresentationMode = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const topologyKey = nodes.map(node => node.id).join('|');
 
   // Initial transform leaves left 320px clear for PathPickerHUD so zero nodes are obscured
   const [transform, setTransform] = useState({ x: 295, y: 40, scale: 0.88 });
@@ -129,7 +136,7 @@ export const TopologyCanvas: React.FC<Props> = ({
     [transform]
   );
 
-  // Fit blueprint cleanly inside the open safe area to the right of left HUD
+  // Fit the active topology cleanly inside the open safe area to the right of the left HUD.
   const handleFitView = useCallback(() => {
     const canvas = canvasRef.current;
     const parent = canvas?.parentElement;
@@ -139,19 +146,24 @@ export const TopologyCanvas: React.FC<Props> = ({
     const leftPadding = isPresentationMode ? 40 : 372;
     const availW = Math.max(cw - leftPadding - 40, 400);
     const availH = Math.max(ch - 170, 320);
-    const bpW = 920;
-    const bpH = 540;
-    const scale = Math.min(availW / bpW, availH / bpH, 1.15);
-    const offsetX = leftPadding + (availW - bpW * scale) / 2 - 60 * scale;
-    const offsetY = 66 + (availH - bpH * scale) / 2 - 70 * scale;
+    const activeNodes = nodesRef.current;
+    const minX = activeNodes.length ? Math.min(...activeNodes.map(node => node.position.x)) - 60 : 60;
+    const maxX = activeNodes.length ? Math.max(...activeNodes.map(node => node.position.x)) + 60 : 980;
+    const minY = activeNodes.length ? Math.min(...activeNodes.map(node => node.position.y)) - 60 : 70;
+    const maxY = activeNodes.length ? Math.max(...activeNodes.map(node => node.position.y)) + 60 : 610;
+    const worldW = maxX - minX;
+    const worldH = maxY - minY;
+    const scale = Math.min(availW / worldW, availH / worldH, 1.15);
+    const offsetX = leftPadding + (availW - worldW * scale) / 2 - minX * scale;
+    const offsetY = 66 + (availH - worldH * scale) / 2 - minY * scale;
     setTransform({ x: Math.round(offsetX), y: Math.round(offsetY), scale: Number(scale.toFixed(2)) });
   }, [isPresentationMode]);
 
-  // Auto-fit once on initial mount or when toggling presentation mode
+  // Auto-fit on initial load, when switching topologies, or when toggling presentation mode.
   useEffect(() => {
     const timer = setTimeout(handleFitView, 80);
     return () => clearTimeout(timer);
-  }, [handleFitView]);
+  }, [handleFitView, topologyKey]);
 
   // Detect hop, delivery, and drop events (strictly deduplicated)
   useEffect(() => {
@@ -618,13 +630,62 @@ export const TopologyCanvas: React.FC<Props> = ({
           : accentColor;
         ctx.fill();
 
-        // Glyph
+        // Distinct line-art icons remain legible across node types and platforms.
+        const iconX = node.position.x;
+        const iconY = node.position.y;
+        ctx.strokeStyle = '#FFFFFF';
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = `bold ${r > 15 ? 10 : 8.5}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const glyph = node.type === 'gateway' ? '⟡' : node.type === 'router' ? '△' : node.type === 'mobile' ? '✦' : '●';
-        ctx.fillText(glyph, node.position.x, node.position.y + 0.5);
+        ctx.lineWidth = 1.2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        if (node.type === 'gateway') {
+          ctx.beginPath();
+          ctx.moveTo(iconX, iconY - 5);
+          ctx.lineTo(iconX + 5, iconY);
+          ctx.lineTo(iconX, iconY + 5);
+          ctx.lineTo(iconX - 5, iconY);
+          ctx.closePath();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(iconX, iconY, 1.4, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (node.type === 'router') {
+          ctx.beginPath();
+          ctx.arc(iconX, iconY + 2, 4.5, Math.PI * 1.18, Math.PI * 1.82);
+          ctx.arc(iconX, iconY + 2, 2.5, Math.PI * 1.18, Math.PI * 1.82);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(iconX, iconY + 2, 1, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (node.type === 'sensor') {
+          ctx.beginPath();
+          ctx.arc(iconX, iconY, 2.5, 0, Math.PI * 2);
+          ctx.moveTo(iconX - 5, iconY);
+          ctx.lineTo(iconX - 3.5, iconY);
+          ctx.moveTo(iconX + 3.5, iconY);
+          ctx.lineTo(iconX + 5, iconY);
+          ctx.moveTo(iconX, iconY - 5);
+          ctx.lineTo(iconX, iconY - 3.5);
+          ctx.moveTo(iconX, iconY + 3.5);
+          ctx.lineTo(iconX, iconY + 5);
+          ctx.stroke();
+        } else if (node.type === 'mobile') {
+          ctx.beginPath();
+          ctx.moveTo(iconX, iconY - 5);
+          ctx.lineTo(iconX + 4, iconY + 4);
+          ctx.lineTo(iconX, iconY + 2);
+          ctx.lineTo(iconX - 4, iconY + 4);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.roundRect(iconX - 3.5, iconY - 4.5, 7, 9, 1);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(iconX, iconY + 2.5, 0.65, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         // Clean Neomorphic Label Pill
         ctx.font = '600 9.5px "Inter", sans-serif';
@@ -698,6 +759,9 @@ export const TopologyCanvas: React.FC<Props> = ({
         return;
       }
     }
+    let closestLink: NetworkLink | null = null;
+    let closestDistance = Infinity;
+    const hitTolerance = 10 / Math.max(transform.scale, 0.1);
     for (const link of links) {
       const sn = nodes.find(n => n.id === link.source);
       const dn = nodes.find(n => n.id === link.target);
@@ -707,11 +771,17 @@ export const TopologyCanvas: React.FC<Props> = ({
       const t = Math.max(0, Math.min(1, ((wp.x - sn.position.x) * (dn.position.x - sn.position.x) + (wp.y - sn.position.y) * (dn.position.y - sn.position.y)) / l2));
       const px = sn.position.x + t * (dn.position.x - sn.position.x);
       const py = sn.position.y + t * (dn.position.y - sn.position.y);
-      if (Math.hypot(wp.x - px, wp.y - py) <= 12) {
-        onSelectLink(link.id);
-        onSelectNode(null);
-        return;
+      const distance = Math.hypot(wp.x - px, wp.y - py);
+      if (distance <= hitTolerance && distance < closestDistance) {
+        closestLink = link;
+        closestDistance = distance;
       }
+    }
+    if (closestLink) {
+      onSelectLink(closestLink.id);
+      onSelectNode(null);
+      if (isTransferActive) onToggleLinkFailure(closestLink.id);
+      return;
     }
     isDraggingCanvas.current = true;
     dragStart.current = { x: e.clientX - transform.x, y: e.clientY - transform.y };
@@ -759,7 +829,8 @@ export const TopologyCanvas: React.FC<Props> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
-        className="w-full h-full cursor-crosshair block"
+        className={`w-full h-full block ${isTransferActive ? 'cursor-pointer' : 'cursor-crosshair'}`}
+        title={isTransferActive ? 'Click a connection to cut it; click it again to restore it.' : undefined}
       />
 
       {/* Top-Right Static Blueprint Controls Pill — Larger & Crisp */}
@@ -782,7 +853,7 @@ export const TopologyCanvas: React.FC<Props> = ({
           <button
             onClick={handleFitView}
             className="p-2 rounded-xl neu-button-sm text-neu-muted hover:text-neu-text"
-            title="Fit Campus to View"
+            title="Fit Network to View"
           >
             <Maximize2 className="w-4 h-4" />
           </button>

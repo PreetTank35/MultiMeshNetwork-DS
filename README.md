@@ -29,6 +29,7 @@ $$\lambda_{\text{multi}}(N) = O\left(\sqrt{\frac{M}{N}}\right)$$
 
 ### A. Presentation & Visual Canvas (2D + 3D Isometric)
 - **Interactive HTML5 Canvas:** Infinite pan and zoom, drag-and-drop node placement, visual convex-hull sub-mesh perimeters, animated glowing packet particles.
+- **Default City-Scale Scenario:** Load two dense urban meshes (City A and City B) with 78 nodes and 183 links across neighborhood relays, civic services, and redundant dual-radio intercity gateways. The cities use separate HWMP and OLSR routing domains.
 - **3D Isometric Holographic View:** Toggleable Three.js WebGL view rendering nodes as elevated holographic towers and multi-hop traversals as 3D parabolic arcs.
 - **Engineering Dashboard Theme:** High-contrast slate color palette (`#0F172A`, `#1E293B`, `#3B82F6`, `#10B981`, `#F59E0B`, `#EF4444`).
 
@@ -48,6 +49,7 @@ $$\lambda_{\text{multi}}(N) = O\left(\sqrt{\frac{M}{N}}\right)$$
 
 ### D. Fault Injection Studio & Live Telemetry
 - **Fault Studio:** One-click triggers for **"Kill Node"**, **"Cut Gateway Link"**, and **"Jam Frequency Channel"**.
+- **Live Data Transfer:** Stream packets between selected endpoints until stopped; severed links trigger alternate-route discovery for in-flight packets when a viable path remains.
 - **Real-Time Telemetry:** Live Packet Delivery Ratio (PDR %) gauge, End-to-End Latency distribution, Hop Count Histogram, and Gateway Buffer Saturation Heatmap.
 - **JSON Schema Persistence:** One-click export of complete topologies and simulation traces for academic submission.
 
@@ -82,10 +84,10 @@ Open your browser to `http://localhost:5173`.
 
 | Step | Time | Action | Key Talking Points |
 |---|---|---|---|
-| **1. Theoretical Hook** | 0:00–1:30 | Load default screen, open **Tutorials** modal. | State the Gupta-Kumar capacity limit $O(1/\sqrt{N})$. Explain why single monolithic meshes collapse under shared channel contention. |
-| **2. Multi-Mesh Solution** | 1:30–3:30 | Click **"Scenario 1: Smart Campus"**. | Point out the blue Wi-Fi 6 domain (5.2 GHz) and green IoT sensor domain (2.4 GHz) separated by the Amber MRMC Gateways. |
-| **3. Packet Injection** | 3:30–5:30 | Select Source: `Campus AQI Sensor`, Target: `Campus Main Server`. Click **Inject Packet**. Set speed to $0.5\times$. | Watch the packet hop along RPL $\to$ reach Gateway A $\to$ inspect **Gateway Translation** tab showing header rewrite $\to$ forward via HWMP Wi-Fi mesh to server. |
-| **4. Fault Injection & Self-Healing** | 5:30–7:30 | In Fault Studio, click **"Sever Primary Gateway Link"** during an active packet flow. | Highlight instant autonomous rerouting: the simulator detects the severed link and forwards traffic through Backup Gateway B. Show live PDR meter and latency updating. |
+| **1. Default City Meshes** | 0:00–1:30 | Load the default screen and open **Path Finder**. | Introduce City A and City B as separate routing domains connected by two dual-radio gateways. |
+| **2. Multi-Mesh Routing** | 1:30–3:30 | In **Path Finder**, select a City A service and a City B service. | Follow cross-city traffic through a gateway and note the HWMP-to-OLSR domain transition. |
+| **3. Continuous Packet Transfer** | 3:30–5:30 | Choose **Start Continuous Transfer** and leave the stream running. | Packets continue across the selected route until **Stop Data Transfer** is clicked. |
+| **4. Fault Injection & Self-Healing** | 5:30–7:30 | While streaming, click any canvas connection to sever it; click it again to restore it. | The simulator retries packets interrupted mid-transmission and discovers an alternate route when available. Follow route changes in the event console. |
 | **5. 3D Isometric View & Telemetry** | 7:30–9:00 | Click **"3D View"** in the left dock. Drag mouse to orbit. Open **Telemetry Dashboard**. | Demonstrate the 3D parabolic hop arcs, gateway queue buffer heatmap, and hop count histogram. |
 | **6. Trace Export & Defense** | 9:00–10:00 | Click **"Export Trace JSON"** in bottom bar. | Present the standardized schema matching Appendix A.1 of your project report for automated grading. |
 

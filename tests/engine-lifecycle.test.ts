@@ -311,7 +311,7 @@ describe('Fault Studio Actions, Mid-Flight Rerouting, Serialization & Determinis
     const topo = buildLinearMultiDomainFixture();
     engine.loadTopology(topo.submeshes, topo.nodes, topo.links);
 
-    // 1. Mid-transmission link sever drops in-flight packet
+    // 1. Mid-transmission link sever triggers rerouting, then drops if no alternate path exists
     const midTxPkt = engine.injectPacket('n_src', 'n_mid', 'MidTxSever', 4096)!;
     // Step event-by-event until TransmissionStarted fires so packet is in 'transmitting' state
     for (let i = 0; i < 10 && midTxPkt.state !== 'transmitting'; i++) {
@@ -321,7 +321,7 @@ describe('Fault Studio Actions, Mid-Flight Rerouting, Serialization & Determinis
     engine.toggleSeverLink('l_sm');
     engine.step(50);
     assert.strictEqual(engine.metrics.totalPacketsDropped, 1);
-    assert.match(engine.packetHistory[0].dropReason || '', /Link severed mid-transmission/i);
+    assert.match(engine.packetHistory[0].dropReason || '', /Destination Unreachable/i);
 
     engine.toggleSeverLink('l_sm'); // restore
 

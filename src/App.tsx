@@ -6,7 +6,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DiscreteEventEngine } from './core/engine/discreteEventEngine';
 import { updateMobileNodes } from './core/engine/mobility';
-import { getMonolithicMeshTopology, getSmartCampusTopology, getSmartLogisticsTopology } from './data/defaultTopologies';
+import {
+  getCitywideMeshTopology,
+  getMonolithicMeshTopology,
+  getSmartCampusTopology,
+  getSmartLogisticsTopology,
+} from './data/defaultTopologies';
 import { BuilderTool, MeshNode, NetworkLink, NodeType, Packet, SubMeshDomain } from './types/simulator';
 
 import { TopNavbar, ViewTab } from './components/navigation/TopNavbar';
@@ -33,6 +38,15 @@ export function App() {
   const [simTimeMs, setSimTimeMs] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1.0);
+  const [activeTransfer, setActiveTransfer] = useState<{
+    sourceId: string;
+    destId: string;
+    payload: string;
+    packetsSent: number;
+    nextPacketAtSimMs: number;
+    packetIds: string[];
+  } | null>(null);
+  const activeTransferRef = useRef<typeof activeTransfer>(null);
 
   const [activeTab, setActiveTab] = useState<ViewTab>('canvas');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -41,7 +55,7 @@ export function App() {
   const [is3DMode, setIs3DMode] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [highlightedRoute, setHighlightedRoute] = useState<string[] | null>(null);
-  const [activeBlueprintId, setActiveBlueprintId] = useState<string>('campus_academic_wing');
+  const [activeBlueprintId, setActiveBlueprintId] = useState<string>('none');
   const [isDarkTheme, setIsDarkTheme] = useState<boolean>(false); // Default: Soft Light Neomorphism (#E4E9F2)
 
   // Builder State
@@ -64,7 +78,7 @@ export function App() {
   };
 
   useEffect(() => {
-    loadTopology('smart_campus');
+    loadTopology('citywide');
   }, []);
 
   const syncState = () => {
@@ -77,12 +91,14 @@ export function App() {
     setSpeedMultiplier(engine.speedMultiplier);
   };
 
-  const loadTopology = (preset: 'smart_campus' | 'smart_logistics' | 'monolithic') => {
+  const loadTopology = (preset: 'smart_campus' | 'smart_logistics' | 'monolithic' | 'citywide') => {
     const topo =
       preset === 'smart_campus'
         ? getSmartCampusTopology()
         : preset === 'smart_logistics'
         ? getSmartLogisticsTopology()
+        : preset === 'citywide'
+        ? getCitywideMeshTopology()
         : getMonolithicMeshTopology();
 
     setActiveBlueprintId(
@@ -93,6 +109,8 @@ export function App() {
         : 'none'
     );
 
+    activeTransferRef.current = null;
+    setActiveTransfer(null);
     engine.loadTopology(topo.submeshes, topo.nodes, topo.links);
     syncState();
     setSelectedNodeId(null);
@@ -113,6 +131,30 @@ export function App() {
         const dSim = Math.min(dt * engine.speedMultiplier, 100);
         if (updateMobileNodes(engine.nodes, dSim / 1000)) engine.refreshLinkProperties();
         engine.step(dSim);
+        const transfer = activeTransferRef.current;
+        if (transfer && engine.simTimeMs >= transfer.nextPacketAtSimMs) {
+          const packet = engine.injectPacket(transfer.sourceId, transfer.destId, transfer.payload);
+          if (!packet) {
+            for (const packetId of transfer.packetIds) {
+              engine.cancelPacket(packetId, 'Transfer stopped by user');
+            }
+            activeTransferRef.current = null;
+            setActiveTransfer(null);
+            showToast(`Data stream stopped: ${engine.lastValidationError || 'packet injection failed.'}`, 'warn');
+          } else {
+            const updatedTransfer = {
+              ...transfer,
+              packetsSent: transfer.packetsSent + 1,
+              nextPacketAtSimMs: engine.simTimeMs + 1000,
+              packetIds: [
+                ...transfer.packetIds.filter(packetId => engine.activePackets.has(packetId)),
+                packet.id,
+              ],
+            };
+            activeTransferRef.current = updatedTransfer;
+            setActiveTransfer(updatedTransfer);
+          }
+        }
         syncState();
       }
       animId = requestAnimationFrame(loop);
@@ -123,7 +165,13 @@ export function App() {
 
   const handleTogglePlay = () => { engine.isRunning = !engine.isRunning; syncState(); };
   const handleStepForward = () => { engine.step(30); syncState(); };
-  const handleReset = () => { engine.resetSimulation(); setHighlightedRoute(null); syncState(); };
+  const handleReset = () => {
+    activeTransferRef.current = null;
+    setActiveTransfer(null);
+    engine.resetSimulation();
+    setHighlightedRoute(null);
+    syncState();
+  };
   const handleChangeSpeed = (s: number) => { engine.speedMultiplier = s; setSpeedMultiplier(s); };
 
   const handleMoveNode = (id: string, x: number, y: number) => {
@@ -199,6 +247,8 @@ export function App() {
   };
 
   const handleClearCanvas = () => {
+    activeTransferRef.current = null;
+    setActiveTransfer(null);
     engine.clearCanvas();
     setSelectedNodeId(null);
     setSelectedLinkId(null);
@@ -217,6 +267,8 @@ export function App() {
 
   const handleLoadLocalStorage = () => {
     if (engine.loadFromLocalStorage('multimesh_custom_network')) {
+      activeTransferRef.current = null;
+      setActiveTransfer(null);
       syncState();
       showToast('Loaded saved network.', 'success');
     } else {
@@ -226,6 +278,8 @@ export function App() {
 
   const handleImportJSON = (jsonString: string) => {
     if (engine.importTopologyJSON(jsonString)) {
+      activeTransferRef.current = null;
+      setActiveTransfer(null);
       syncState();
       showToast('Imported network JSON!', 'success');
     } else {
@@ -237,6 +291,52 @@ export function App() {
     engine.injectPacket(src, dst, payload);
     if (!engine.isRunning) engine.isRunning = true;
     syncState();
+  };
+
+  const handleStartContinuousTransfer = (src: string, dst: string, payload: string) => {
+    const packet = engine.injectPacket(src, dst, payload);
+    if (!packet) {
+      showToast(`Could not start data stream: ${engine.lastValidationError || 'packet injection failed.'}`, 'warn');
+      return;
+    }
+
+    const transfer = {
+      sourceId: src,
+      destId: dst,
+      payload,
+      packetsSent: 1,
+      nextPacketAtSimMs: engine.simTimeMs + 1000,
+      packetIds: [packet.id],
+    };
+    activeTransferRef.current = transfer;
+    setActiveTransfer(transfer);
+    engine.isRunning = true;
+    syncState();
+  };
+
+  const handleStopContinuousTransfer = () => {
+    const transfer = activeTransferRef.current;
+    const cancelledCount = transfer
+      ? transfer.packetIds.filter(packetId => engine.cancelPacket(packetId)).length
+      : 0;
+    activeTransferRef.current = null;
+    setActiveTransfer(null);
+    syncState();
+    showToast(
+      `Continuous transfer stopped; cancelled ${cancelledCount} in-flight packet${cancelledCount === 1 ? '' : 's'}.`,
+      'info'
+    );
+  };
+
+  const handleToggleSeverLink = (id: string) => {
+    const isSevered = engine.toggleSeverLink(id);
+    syncState();
+    showToast(
+      isSevered
+        ? 'Connection cut. Active packets are checking alternate routes.'
+        : 'Connection restored.',
+      isSevered ? 'warn' : 'success'
+    );
   };
 
   const handleRunExperiment = (scenario: 'smart_campus' | 'monolithic') => {
@@ -320,6 +420,8 @@ export function App() {
                   setSelectedNodeId(null);
                 }}
                 onMoveNode={handleMoveNode}
+                isTransferActive={activeTransfer !== null}
+                onToggleLinkFailure={handleToggleSeverLink}
               />
             )}
 
@@ -357,6 +459,9 @@ export function App() {
                   activeRoutePath={highlightedRoute}
                   onHighlightRoute={setHighlightedRoute}
                   onTransmitPacket={handleInjectPacket}
+                  activeTransfer={activeTransfer}
+                  onStartContinuousTransfer={handleStartContinuousTransfer}
+                  onStopContinuousTransfer={handleStopContinuousTransfer}
                 />
               </>
             )}
@@ -391,8 +496,7 @@ export function App() {
                 syncState();
               }}
               onToggleSeverLink={id => {
-                engine.toggleSeverLink(id);
-                syncState();
+                handleToggleSeverLink(id);
               }}
               onToggleJamFrequency={band => {
                 engine.toggleJamFrequency(band);
