@@ -1,13 +1,13 @@
 /**
  * Multi-Mesh Network Simulator — Main Application Orchestrator
- * Hyper-minimalist, full-screen, tab-routed architecture
+ * Tactile Light/Dark Neomorphism • Zero-Overlap Floating Workspace • Blueprint Maps
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import { DiscreteEventEngine } from './core/engine/discreteEventEngine';
 import { updateMobileNodes } from './core/engine/mobility';
-import { getMonolithicMeshTopology, getSmartCampusTopology } from './data/defaultTopologies';
-import { BuilderTool, MeshNode, NetworkLink, NodeType, Packet, SubMeshDomain, TopologyExportJSON } from './types/simulator';
+import { getMonolithicMeshTopology, getSmartCampusTopology, getSmartLogisticsTopology } from './data/defaultTopologies';
+import { BuilderTool, MeshNode, NetworkLink, NodeType, Packet, SubMeshDomain } from './types/simulator';
 
 import { TopNavbar, ViewTab } from './components/navigation/TopNavbar';
 import { TopologyCanvas } from './components/canvas/TopologyCanvas';
@@ -41,22 +41,31 @@ export function App() {
   const [is3DMode, setIs3DMode] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [highlightedRoute, setHighlightedRoute] = useState<string[] | null>(null);
+  const [activeBlueprintId, setActiveBlueprintId] = useState<string>('campus_academic_wing');
+  const [isDarkTheme, setIsDarkTheme] = useState<boolean>(false); // Default: Soft Light Neomorphism (#E4E9F2)
 
-  // Network Builder State
+  // Builder State
   const [activeTool, setActiveTool] = useState<BuilderTool>('select');
   const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
   const [isSubMeshModalOpen, setIsSubMeshModalOpen] = useState(false);
   const [activeSubmeshId, setActiveSubmeshId] = useState<string>('');
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'warn' } | null>(null);
 
+  // Sync CSS data-theme attribute on documentElement
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDarkTheme ? 'dark' : 'light');
+  }, [isDarkTheme]);
+
   const showToast = (message: string, type: 'info' | 'success' | 'warn' = 'info') => {
     setToast({ message, type });
     setTimeout(() => {
-      setToast((prev) => (prev?.message === message ? null : prev));
-    }, 3500);
+      setToast(prev => (prev?.message === message ? null : prev));
+    }, 3200);
   };
 
-  useEffect(() => { loadTopology('smart_campus'); }, []);
+  useEffect(() => {
+    loadTopology('smart_campus');
+  }, []);
 
   const syncState = () => {
     setNodes(Array.from(engine.nodes.values()));
@@ -68,22 +77,38 @@ export function App() {
     setSpeedMultiplier(engine.speedMultiplier);
   };
 
-  const loadTopology = (preset: 'smart_campus' | 'monolithic') => {
-    const topo = preset === 'smart_campus' ? getSmartCampusTopology() : getMonolithicMeshTopology();
+  const loadTopology = (preset: 'smart_campus' | 'smart_logistics' | 'monolithic') => {
+    const topo =
+      preset === 'smart_campus'
+        ? getSmartCampusTopology()
+        : preset === 'smart_logistics'
+        ? getSmartLogisticsTopology()
+        : getMonolithicMeshTopology();
+
+    setActiveBlueprintId(
+      preset === 'smart_campus'
+        ? 'campus_academic_wing'
+        : preset === 'smart_logistics'
+        ? 'smart_logistics'
+        : 'none'
+    );
+
     engine.loadTopology(topo.submeshes, topo.nodes, topo.links);
     syncState();
-    setSelectedNodeId(null); setSelectedLinkId(null);
+    setSelectedNodeId(null);
+    setSelectedLinkId(null);
     setConnectSourceId(null);
-    if (topo.submeshes.length > 0) {
-      setActiveSubmeshId(topo.submeshes[0].id);
-    }
+    setHighlightedRoute(null);
+    if (topo.submeshes.length > 0) setActiveSubmeshId(topo.submeshes[0].id);
   };
 
-  // Main Simulation Loop
+  // Simulation Loop
   useEffect(() => {
-    let animId: number, lastT = performance.now();
+    let animId: number,
+      lastT = performance.now();
     const loop = (now: number) => {
-      const dt = now - lastT; lastT = now;
+      const dt = now - lastT;
+      lastT = now;
       if (engine.isRunning) {
         const dSim = Math.min(dt * engine.speedMultiplier, 100);
         if (updateMobileNodes(engine.nodes, dSim / 1000)) engine.refreshLinkProperties();
@@ -98,45 +123,41 @@ export function App() {
 
   const handleTogglePlay = () => { engine.isRunning = !engine.isRunning; syncState(); };
   const handleStepForward = () => { engine.step(30); syncState(); };
-  const handleReset = () => { engine.resetSimulation(); syncState(); };
+  const handleReset = () => { engine.resetSimulation(); setHighlightedRoute(null); syncState(); };
   const handleChangeSpeed = (s: number) => { engine.speedMultiplier = s; setSpeedMultiplier(s); };
 
   const handleMoveNode = (id: string, x: number, y: number) => {
     const n = engine.nodes.get(id);
     if (!n) return;
-    n.position.x = x; n.position.y = y;
-    engine.refreshLinkProperties(); syncState();
+    n.position.x = x;
+    n.position.y = y;
+    engine.refreshLinkProperties();
+    syncState();
   };
 
-  // Network Builder Actions
   const handleAddNode = (type: NodeType, submeshId?: string) => {
     const targetSubmesh = submeshId
       ? engine.submeshes.get(submeshId)
-      : (engine.submeshes.get(activeSubmeshId) || Array.from(engine.submeshes.values())[0]);
+      : engine.submeshes.get(activeSubmeshId) || Array.from(engine.submeshes.values())[0];
 
     if (!targetSubmesh) {
-      showToast('Please create or select a sub-mesh domain first.', 'warn');
+      showToast('Create or select a sub-mesh domain first.', 'warn');
       return;
     }
 
     const id = `node_${type}_${Date.now().toString().slice(-4)}`;
-    const countOfType = Array.from(engine.nodes.values()).filter((n) => n.type === type).length + 1;
+    const count = Array.from(engine.nodes.values()).filter(n => n.type === type).length + 1;
     const typeLabel = type === 'router' ? 'RTR' : type === 'gateway' ? 'GW' : type === 'sensor' ? 'SNS' : 'MOB';
-
-    const posX = 380 + (Math.random() - 0.5) * 320;
-    const posY = 260 + (Math.random() - 0.5) * 220;
     const ifType = type === 'sensor' ? 'zigbee' : 'wifi';
-    const defaultBandwidth = type === 'sensor' ? 0.25 : type === 'gateway' ? 100 : 54;
-    const defaultTxPower = type === 'gateway' ? 24 : type === 'sensor' ? 14 : 20;
 
     const newNode: MeshNode = {
       id,
-      name: `${typeLabel}-${countOfType} (${targetSubmesh.protocol})`,
+      name: `${typeLabel}-${count} (${targetSubmesh.protocol})`,
       submeshId: targetSubmesh.id,
       type,
-      position: { x: Math.round(posX), y: Math.round(posY) },
+      position: { x: Math.round(450 + (Math.random() - 0.5) * 260), y: Math.round(300 + (Math.random() - 0.5) * 180) },
       mobilityModel: type === 'mobile' ? 'random_waypoint' : 'static',
-      txPowerDbm: defaultTxPower,
+      txPowerDbm: type === 'gateway' ? 24 : type === 'sensor' ? 14 : 20,
       queueCapacity: type === 'gateway' ? 64 : 32,
       currentQueue: [],
       isAlive: true,
@@ -147,8 +168,8 @@ export function App() {
           mac: `00:1A:2B:EE:${id.slice(-2)}:01`,
           channel: targetSubmesh.channelNumber,
           frequencyBand: targetSubmesh.frequencyBand,
-          txPowerDbm: defaultTxPower,
-          bandwidthMbps: defaultBandwidth,
+          txPowerDbm: type === 'gateway' ? 24 : 18,
+          bandwidthMbps: type === 'sensor' ? 0.25 : 54,
         },
       ],
       routingTable: {},
@@ -163,13 +184,10 @@ export function App() {
     if (sourceId === targetId) return;
     const link = engine.addLink(sourceId, targetId);
     if (link) {
-      showToast(
-        `Link created: ${engine.nodes.get(sourceId)?.name} ↔ ${engine.nodes.get(targetId)?.name}`,
-        'success'
-      );
+      showToast(`Connected ${engine.nodes.get(sourceId)?.name} ↔ ${engine.nodes.get(targetId)?.name}`, 'success');
       syncState();
     } else {
-      showToast('Cannot connect link: already connected or invalid nodes.', 'warn');
+      showToast('Link already exists or invalid nodes.', 'warn');
     }
   };
 
@@ -177,7 +195,7 @@ export function App() {
     engine.addSubMesh(domain);
     setActiveSubmeshId(domain.id);
     syncState();
-    showToast(`Created Sub-Mesh Domain "${domain.name}" [${domain.protocol}]`, 'success');
+    showToast(`Created "${domain.name}" [${domain.protocol}]`, 'success');
   };
 
   const handleClearCanvas = () => {
@@ -185,49 +203,50 @@ export function App() {
     setSelectedNodeId(null);
     setSelectedLinkId(null);
     setConnectSourceId(null);
+    setHighlightedRoute(null);
     syncState();
-    showToast('Canvas cleared: All nodes and links removed.', 'warn');
+    showToast('Canvas cleared.', 'warn');
   };
 
   const handleSaveLocalStorage = () => {
-    const ok = engine.saveToLocalStorage('multimesh_custom_network');
-    if (ok) {
-      showToast('Custom network snapshot saved to LocalStorage!', 'success');
-    } else {
-      showToast('Failed to save to LocalStorage.', 'warn');
-    }
+    showToast(
+      engine.saveToLocalStorage('multimesh_custom_network') ? 'Saved to Browser LocalStorage!' : 'Save failed.',
+      'success'
+    );
   };
 
   const handleLoadLocalStorage = () => {
-    const ok = engine.loadFromLocalStorage('multimesh_custom_network');
-    if (ok) {
+    if (engine.loadFromLocalStorage('multimesh_custom_network')) {
       syncState();
-      showToast('Loaded custom network from LocalStorage.', 'success');
+      showToast('Loaded saved network.', 'success');
     } else {
-      showToast('No saved custom network found in LocalStorage.', 'warn');
+      showToast('No saved network found in LocalStorage.', 'warn');
     }
   };
 
   const handleImportJSON = (jsonString: string) => {
-    const ok = engine.importTopologyJSON(jsonString);
-    if (ok) {
+    if (engine.importTopologyJSON(jsonString)) {
       syncState();
-      showToast('Successfully imported network topology JSON!', 'success');
+      showToast('Imported network JSON!', 'success');
     } else {
-      showToast('Failed to parse or import network JSON.', 'warn');
+      showToast('Invalid network JSON.', 'warn');
     }
   };
 
   const handleInjectPacket = (src: string, dst: string, payload: string) => {
-    engine.injectPacket(src, dst, payload); syncState();
+    engine.injectPacket(src, dst, payload);
+    if (!engine.isRunning) engine.isRunning = true;
+    syncState();
   };
 
   const handleRunExperiment = (scenario: 'smart_campus' | 'monolithic') => {
-    loadTopology(scenario); setActiveTab('canvas');
+    loadTopology(scenario);
+    setActiveTab('canvas');
     setTimeout(() => {
       if (scenario === 'smart_campus') engine.injectPacket('node_iot_solar', 'node_wf_server', 'Solar Telemetry via RPL');
       else engine.injectPacket('node_flat_0_0', 'node_flat_3_3', 'Contention Test');
-      engine.isRunning = true; syncState();
+      engine.isRunning = true;
+      syncState();
     }, 300);
   };
 
@@ -235,60 +254,58 @@ export function App() {
     const data = engine.exportTopologyJSON('Multi-Mesh Export');
     const a = document.createElement('a');
     a.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
-    a.download = `multimesh_${Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove();
-    showToast('Exported topology JSON file.', 'info');
+    a.download = `multimesh_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast('Exported topology JSON.', 'info');
   };
 
   const selectedNode = selectedNodeId ? engine.nodes.get(selectedNodeId) || null : null;
   const selectedLink = selectedLinkId ? engine.links.find(l => l.id === selectedLinkId) || null : null;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-canvas-deep overflow-hidden select-none font-sans text-slate-100">
-      <TopNavbar activeTab={activeTab} onChangeTab={setActiveTab} onLoadScenario={loadTopology}
-        isPresentationMode={isPresentationMode} onTogglePresentationMode={() => setIsPresentationMode(!isPresentationMode)}
-        onExportJSON={handleExportJSON} onReset={handleReset} />
+    <div className="flex flex-col h-screen w-screen neu-base overflow-hidden select-none font-sans">
+      <TopNavbar
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        onLoadScenario={loadTopology}
+        isPresentationMode={isPresentationMode}
+        onTogglePresentationMode={() => setIsPresentationMode(!isPresentationMode)}
+        isDarkTheme={isDarkTheme}
+        onToggleTheme={() => setIsDarkTheme(!isDarkTheme)}
+        onExportJSON={handleExportJSON}
+        onReset={handleReset}
+      />
 
       <main className="flex-1 relative overflow-hidden">
-        {/* TAB 1: Topology Canvas */}
         {activeTab === 'canvas' && (
           <>
-            {/* Dynamic Network Builder Floating Toolbar */}
-            <NetworkBuilderToolbar
-              activeTool={activeTool}
-              onChangeTool={(tool) => {
-                setActiveTool(tool);
-                if (tool !== 'connect_link') setConnectSourceId(null);
-              }}
-              submeshes={submeshes}
-              selectedSubmeshId={activeSubmeshId || (submeshes[0]?.id || '')}
-              onSelectSubmeshId={setActiveSubmeshId}
-              onAddNode={handleAddNode}
-              connectSourceId={connectSourceId}
-              onCancelConnect={() => {
-                setConnectSourceId(null);
-                setActiveTool('select');
-              }}
-              onOpenSubMeshModal={() => setIsSubMeshModalOpen(true)}
-              onClearCanvas={handleClearCanvas}
-              onSaveLocalStorage={handleSaveLocalStorage}
-              onLoadLocalStorage={handleLoadLocalStorage}
-              onExportJSON={handleExportJSON}
-              onImportJSON={handleImportJSON}
-              nodeCount={nodes.length}
-              linkCount={links.length}
-            />
-
             {is3DMode ? (
-              <Isometric3DView nodes={nodes} links={links} submeshes={submeshes} activePackets={activePackets} />
+              <Isometric3DView
+                nodes={nodes}
+                links={links}
+                submeshes={submeshes}
+                activePackets={activePackets}
+                isDarkTheme={isDarkTheme}
+              />
             ) : (
-              <TopologyCanvas nodes={nodes} links={links} submeshes={submeshes} activePackets={activePackets}
-                selectedNodeId={selectedNodeId} selectedLinkId={selectedLinkId}
+              <TopologyCanvas
+                nodes={nodes}
+                links={links}
+                submeshes={submeshes}
+                activePackets={activePackets}
+                selectedNodeId={selectedNodeId}
+                selectedLinkId={selectedLinkId}
+                activeBlueprintId={activeBlueprintId}
                 highlightedRoute={highlightedRoute}
+                isDarkTheme={isDarkTheme}
+                isPresentationMode={isPresentationMode}
                 onSelectNode={id => {
                   if (activeTool === 'connect_link' && id) {
                     if (!connectSourceId) {
                       setConnectSourceId(id);
-                      showToast(`Source node selected (${engine.nodes.get(id)?.name}). Now click target node.`, 'info');
+                      showToast(`Source selected (${engine.nodes.get(id)?.name}). Click target node.`, 'info');
                     } else if (connectSourceId !== id) {
                       handleCreateLink(connectSourceId, id);
                       setConnectSourceId(null);
@@ -298,50 +315,113 @@ export function App() {
                   setSelectedNodeId(id);
                   setSelectedLinkId(null);
                 }}
-                onSelectLink={id => { setSelectedLinkId(id); setSelectedNodeId(null); }}
-                onMoveNode={handleMoveNode} />
+                onSelectLink={id => {
+                  setSelectedLinkId(id);
+                  setSelectedNodeId(null);
+                }}
+                onMoveNode={handleMoveNode}
+              />
             )}
 
-            <FloatingPlayerBar isRunning={isRunning} simTimeMs={simTimeMs} speedMultiplier={speedMultiplier} logs={engine.logs}
-              nodes={nodes} submeshes={submeshes} is3DMode={is3DMode}
-              onTogglePlay={handleTogglePlay} onStepForward={handleStepForward} onChangeSpeed={handleChangeSpeed}
-              onInjectPacket={handleInjectPacket} onToggle3D={() => setIs3DMode(!is3DMode)} onAddNode={handleAddNode} />
+            {/* Unified Non-Overlapping Left HUD Column */}
+            {!isPresentationMode && (
+              <div className="absolute top-3 left-3 z-30 flex flex-col gap-2.5 items-start pointer-events-none max-w-[calc(100vw-280px)]">
+                <NetworkBuilderToolbar
+                  activeTool={activeTool}
+                  onChangeTool={tool => {
+                    setActiveTool(tool);
+                    if (tool !== 'connect_link') setConnectSourceId(null);
+                  }}
+                  submeshes={submeshes}
+                  selectedSubmeshId={activeSubmeshId || (submeshes[0]?.id || '')}
+                  onSelectSubmeshId={setActiveSubmeshId}
+                  onAddNode={handleAddNode}
+                  connectSourceId={connectSourceId}
+                  onCancelConnect={() => {
+                    setConnectSourceId(null);
+                    setActiveTool('select');
+                  }}
+                  onOpenSubMeshModal={() => setIsSubMeshModalOpen(true)}
+                  onClearCanvas={handleClearCanvas}
+                  onSaveLocalStorage={handleSaveLocalStorage}
+                  onLoadLocalStorage={handleLoadLocalStorage}
+                  onExportJSON={handleExportJSON}
+                  onImportJSON={handleImportJSON}
+                />
 
-            <PathPickerHUD
+                <PathPickerHUD
+                  nodes={nodes}
+                  links={links}
+                  submeshes={submeshes}
+                  selectedNodeId={selectedNodeId}
+                  activeRoutePath={highlightedRoute}
+                  onHighlightRoute={setHighlightedRoute}
+                  onTransmitPacket={handleInjectPacket}
+                />
+              </div>
+            )}
+
+            <FloatingPlayerBar
+              isRunning={isRunning}
+              simTimeMs={simTimeMs}
+              speedMultiplier={speedMultiplier}
+              logs={engine.logs}
               nodes={nodes}
-              links={links}
               submeshes={submeshes}
-              selectedNodeId={selectedNodeId}
-              activeRoutePath={highlightedRoute}
-              onHighlightRoute={setHighlightedRoute}
-              onTransmitPacket={handleInjectPacket}
-              className="top-4 left-4"
+              is3DMode={is3DMode}
+              onTogglePlay={handleTogglePlay}
+              onStepForward={handleStepForward}
+              onChangeSpeed={handleChangeSpeed}
+              onInjectPacket={handleInjectPacket}
+              onToggle3D={() => setIs3DMode(!is3DMode)}
+              onAddNode={handleAddNode}
             />
 
-            <NodeDrawer node={selectedNode} link={selectedLink} submeshes={submeshes} nodes={nodes}
-              onClose={() => { setSelectedNodeId(null); setSelectedLinkId(null); }}
-              onToggleKillNode={id => { engine.toggleKillNode(id); syncState(); }}
-              onToggleSeverLink={id => { engine.toggleSeverLink(id); syncState(); }}
-              onToggleJamFrequency={band => { engine.toggleJamFrequency(band); syncState(); }} />
+            <NodeDrawer
+              node={selectedNode}
+              link={selectedLink}
+              submeshes={submeshes}
+              nodes={nodes}
+              onClose={() => {
+                setSelectedNodeId(null);
+                setSelectedLinkId(null);
+              }}
+              onToggleKillNode={id => {
+                engine.toggleKillNode(id);
+                syncState();
+              }}
+              onToggleSeverLink={id => {
+                engine.toggleSeverLink(id);
+                syncState();
+              }}
+              onToggleJamFrequency={band => {
+                engine.toggleJamFrequency(band);
+                syncState();
+              }}
+            />
           </>
         )}
 
-        {/* TAB 2: Packet X-Ray Studio */}
         {activeTab === 'studio' && (
-          <PacketStudioView nodes={nodes} links={links} submeshes={submeshes} activePackets={activePackets}
-            translationTraces={engine.translationTraces} onInjectPacket={handleInjectPacket} />
+          <PacketStudioView
+            nodes={nodes}
+            links={links}
+            submeshes={submeshes}
+            activePackets={[
+              ...activePackets,
+              ...engine.packetHistory.filter(h => !activePackets.some(a => a.id === h.id)),
+            ]}
+            translationTraces={engine.translationTraces}
+            onInjectPacket={handleInjectPacket}
+          />
         )}
 
-        {/* TAB 3: Telemetry Hub */}
         {activeTab === 'telemetry' && <TelemetryView metrics={engine.metrics} />}
-
-        {/* TAB 4: Interactive Guide */}
         {activeTab === 'guide' && <GuideView onRunExperiment={handleRunExperiment} />}
       </main>
 
       <PacketXRayModal packet={inspectedPacket} nodes={nodes} submeshes={submeshes} onClose={() => setInspectedPacket(null)} />
 
-      {/* Sub-Mesh Domain Configuration Modal */}
       <SubMeshConfigModal
         isOpen={isSubMeshModalOpen}
         onClose={() => setIsSubMeshModalOpen(false)}
@@ -349,27 +429,11 @@ export function App() {
         existingCount={submeshes.length}
       />
 
-      {/* Floating Action Feedback Toast */}
       {toast && (
-        <div
-          className={`fixed bottom-24 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-xs font-semibold shadow-2xl backdrop-blur-md animate-fade-in ${
-            toast.type === 'success'
-              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40'
-              : toast.type === 'warn'
-              ? 'bg-amber-950/90 text-amber-200 border-amber-500/40'
-              : 'bg-slate-900/90 text-cyan-200 border-cyan-500/40'
-          }`}
-          style={{
-            boxShadow: '6px 6px 20px #080a0f, -6px -6px 20px #1c2332',
-          }}
-        >
+        <div className="fixed bottom-20 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl neu-convex text-xs font-semibold text-neu-text animate-fade-up">
           <div
             className={`w-2 h-2 rounded-full ${
-              toast.type === 'success'
-                ? 'bg-emerald-400'
-                : toast.type === 'warn'
-                ? 'bg-amber-400'
-                : 'bg-cyan-400'
+              toast.type === 'success' ? 'bg-emerald-500' : toast.type === 'warn' ? 'bg-amber-500' : 'bg-sky-500'
             }`}
           />
           <span>{toast.message}</span>

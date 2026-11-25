@@ -16,8 +16,8 @@ import {
   TopologyExportJSON
 } from '../../types/simulator';
 import { calculateDistance, evaluatePhysicalLink } from '../math/rfPropagation';
-import { resolveAodvRoute, resolveHwmpRoute, resolveOlsrRoute, resolveRplRoute } from '../protocols/routing';
-import { getLocalGatewayForSubmesh, HeaderTranslationTrace, translatePacketHeader } from '../protocols/gateway';
+import { calculateMultiMeshRoute } from '../protocols/routing';
+import { translatePacketHeader, HeaderTranslationTrace } from '../protocols/gateway';
 
 export interface VisualParticle {
   packetId: string;
@@ -47,8 +47,9 @@ export class DiscreteEventEngine {
   public links: NetworkLink[] = [];
   public submeshes: Map<string, SubMeshDomain> = new Map();
 
-  // Active in-flight packets
+  // Active in-flight packets & retained history
   public activePackets: Map<string, Packet> = new Map();
+  public packetHistory: Packet[] = [];
   public eventQueue: SimulationEvent[] = [];
   public logs: SimulationStepLog[] = [];
   public translationTraces: HeaderTranslationTrace[] = [];
@@ -75,8 +76,8 @@ export class DiscreteEventEngine {
       tickRateMs: 50,
       simSpeedMultiplier: 1.0,
       pathLossModel: 'LogDistance',
-      pathLossExponent: 3.2,
-      shadowingStdDevDb: 3.5,
+      pathLossExponent: 2.8,
+      shadowingStdDevDb: 0.0,
       referenceDistanceMeters: 1.0,
       noiseFloorDbm: -95.0,
       carrierFreqGhz: 2.4,
@@ -153,6 +154,7 @@ export class DiscreteEventEngine {
     this.simTimeMs = 0;
     this.isRunning = false;
     this.activePackets.clear();
+    this.packetHistory = [];
     this.eventQueue = [];
     this.logs = [];
     this.translationTraces = [];
@@ -300,58 +302,21 @@ export class DiscreteEventEngine {
       return;
     }
 
-    // Determine Next Hop
-    let nextHopId: string | null = null;
-    const isSameSubmesh = currentNode.submeshId === targetNode.submeshId;
-
-    if (isSameSubmesh) {
-      // Intra-domain routing using submesh protocol
-      const submesh = this.submeshes.get(currentNode.submeshId);
-      const protocol = submesh?.protocol || 'HWMP';
-
-      if (protocol === 'AODV') {
-        const res = resolveAodvRoute(currentNode, targetNode, this.nodes, this.links);
-        nextHopId = res.nextHopId;
-      } else if (protocol === 'OLSR') {
-        const res = resolveOlsrRoute(currentNode, targetNode, this.nodes, this.links);
-        nextHopId = res.nextHopId;
-      } else if (protocol === 'RPL') {
-        const gateway = getLocalGatewayForSubmesh(currentNode.submeshId, targetNode.submeshId, this.nodes, this.links);
-        const res = resolveRplRoute(currentNode, targetNode, this.nodes, this.links, gateway?.id || currentNode.id);
-        nextHopId = res.nextHopId;
-      } else {
-        // HWMP default
-        const res = resolveHwmpRoute(currentNode, targetNode, this.nodes, this.links);
-        nextHopId = res.nextHopId;
-      }
-    } else {
-      // Inter-domain: Need to reach boundary gateway
-      if (currentNode.type === 'gateway') {
-        // This node IS a gateway! Translate and handoff to target submesh
-        this.handleGatewayTranslate(packetId, currentNode.id);
-        return;
-      } else {
-        // Route towards local gateway
-        const localGateway = getLocalGatewayForSubmesh(currentNode.submeshId, targetNode.submeshId, this.nodes, this.links);
-        if (!localGateway || !localGateway.isAlive) {
-          this.handlePacketDrop(packetId, 'No reachable boundary gateway for inter-domain bridging');
-          return;
-        }
-
-        const submesh = this.submeshes.get(currentNode.submeshId);
-        const protocol = submesh?.protocol || 'HWMP';
-        if (protocol === 'RPL') {
-          const res = resolveRplRoute(currentNode, localGateway, this.nodes, this.links, localGateway.id);
-          nextHopId = res.nextHopId;
-        } else {
-          const res = resolveHwmpRoute(currentNode, localGateway, this.nodes, this.links);
-          nextHopId = res.nextHopId;
-        }
-      }
+    // Check if at a boundary gateway needing cross-domain protocol translation (once per gateway per packet)
+    const alreadyTranslatedHere = this.translationTraces.some(
+      t => t.gatewayId === currentNode.id && t.rawHeaderBefore?.meshSequence === packet.sequenceNum
+    );
+    if (currentNode.type === 'gateway' && packet.submeshSrc !== packet.submeshDst && !alreadyTranslatedHere) {
+      this.handleGatewayTranslate(packetId, currentNode.id);
+      return;
     }
 
+    // Compute multi-mesh shortest path across current submeshes & gateways
+    const route = calculateMultiMeshRoute(currentNode.id, targetNode.id, this.nodes, this.links, this.submeshes);
+    const nextHopId: string | null = route.found && route.path.length >= 2 ? route.path[1] : null;
+
     if (!nextHopId) {
-      this.handlePacketDrop(packetId, `Routing failure: No viable route from ${currentNode.name} toward target`);
+      this.handlePacketDrop(packetId, route.error || `Routing failure: No viable route from ${currentNode.name} toward target`);
       return;
     }
 
@@ -465,7 +430,10 @@ export class DiscreteEventEngine {
       packet.dst
     );
 
-    // Retain for animation and clean up
+    // Retain in packet history and clean up active flight animation
+    this.packetHistory.unshift({ ...packet });
+    if (this.packetHistory.length > 40) this.packetHistory.pop();
+
     setTimeout(() => {
       this.activePackets.delete(packetId);
     }, 2000);
@@ -487,6 +455,9 @@ export class DiscreteEventEngine {
       packetId,
       packet.currentHop
     );
+
+    this.packetHistory.unshift({ ...packet });
+    if (this.packetHistory.length > 40) this.packetHistory.pop();
 
     setTimeout(() => {
       this.activePackets.delete(packetId);

@@ -14,7 +14,7 @@ export const SPEED_OF_LIGHT = 3e8;
 export function calculateDistance(
   pos1: { x: number; y: number; z?: number },
   pos2: { x: number; y: number; z?: number },
-  scalePixelsToMeters: number = 0.5 // 1 pixel = 0.5 meters default
+  scalePixelsToMeters: number = 0.05 // Matches CAD floor plan scale: 20px = 1 meter
 ): number {
   const dx = (pos1.x - pos2.x) * scalePixelsToMeters;
   const dy = (pos1.y - pos2.y) * scalePixelsToMeters;
@@ -49,8 +49,8 @@ export function calculateFriisLoss(
 export function calculateLogDistanceLoss(
   distanceMeters: number,
   frequencyGhz: number,
-  gamma: number = 3.2,
-  shadowingStdDevDb: number = 4.0,
+  gamma: number = 2.8,
+  shadowingStdDevDb: number = 0.0,
   referenceDistance: number = 1.0
 ): number {
   const d = Math.max(distanceMeters, referenceDistance);
@@ -60,11 +60,14 @@ export function calculateLogDistanceLoss(
   // Deterministic log-distance progression
   const logComponent = 10 * gamma * Math.log10(d / referenceDistance);
 
-  // Box-Muller transform for zero-mean Gaussian shadow fading
-  const u1 = Math.random() || 0.0001;
-  const u2 = Math.random() || 0.0001;
-  const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-  const shadowFading = z0 * shadowingStdDevDb;
+  // Optional zero-mean Gaussian shadow fading when stdDev > 0
+  let shadowFading = 0;
+  if (shadowingStdDevDb > 0) {
+    const u1 = Math.random() || 0.0001;
+    const u2 = Math.random() || 0.0001;
+    const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+    shadowFading = z0 * shadowingStdDevDb;
+  }
 
   return Math.max(plD0 + logComponent + shadowFading, 0);
 }

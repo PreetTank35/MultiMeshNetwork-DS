@@ -1,13 +1,10 @@
 /**
- * High-Performance Full-Screen 2D Topology & Architectural Blueprint Canvas
- * Features:
- * - High-fidelity CAD architectural blueprint floor plans (MIT Campus Wing & Industrial Logistics)
- * - Blueprint opacity slider control (0% to 100%) and element toggles
- * - Dynamic RF radio wave propagation rings with frequency-dependent wavelength ripples
- * - Glowing active conduit beams (#06B6D4 / #F59E0B) with photon energy pulses
- * - High-tech packet particles with comet trails, gateway protocol translation tags,
- *   drop burst shockwaves with debris sparks, and ACK return pulses
- * - 60 FPS smooth rendering loop with interactive panning, zooming, and node repositioning
+ * Full-Screen 2D Topology & Architectural Blueprint Canvas
+ * - Adaptive Light/Dark Neomorphism drafting surface
+ * - Clean architectural floor plans (zero noisy blue lines or diagonal hatching)
+ * - Smart safe-area fit-to-screen so left PathPickerHUD never obscures any node
+ * - Tactile neomorphic node tokens, radio wave propagation rings, glowing active conduits,
+ *   packet comet trails, gateway translation tags, drop shockwaves, and ACK return pulses.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,17 +15,14 @@ import {
   BlueprintFloorPlan,
   CAMPUS_ACADEMIC_BLUEPRINT,
   drawBlueprintFloorPlan,
-  LOGISTICS_FACILITY_BLUEPRINT
 } from '../../data/blueprintMaps';
 
-// Particle & visual effect interfaces
 interface WaveEffect {
   x: number;
   y: number;
   startTime: number;
   maxRadius: number;
   color: string;
-  frequencyBand?: string;
 }
 
 interface DropBurst {
@@ -45,7 +39,6 @@ interface AckParticle {
   dx: number;
   dy: number;
   startTime: number;
-  color: string;
 }
 
 interface Props {
@@ -60,6 +53,8 @@ interface Props {
   onMoveNode: (id: string, x: number, y: number) => void;
   activeBlueprintId?: string;
   highlightedRoute?: string[] | null;
+  isDarkTheme?: boolean;
+  isPresentationMode?: boolean;
 }
 
 export const TopologyCanvas: React.FC<Props> = ({
@@ -73,50 +68,42 @@ export const TopologyCanvas: React.FC<Props> = ({
   onSelectLink,
   onMoveNode,
   activeBlueprintId = 'campus_academic_wing',
-  highlightedRoute
+  highlightedRoute,
+  isDarkTheme = false,
+  isPresentationMode = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Transform (pan & zoom)
-  const [transform, setTransform] = useState({ x: 60, y: 30, scale: 0.95 });
+  // Initial transform leaves left 320px clear for PathPickerHUD so zero nodes are obscured
+  const [transform, setTransform] = useState({ x: 295, y: 40, scale: 0.88 });
   const isDraggingCanvas = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const draggedNodeId = useRef<string | null>(null);
 
   // Blueprint Controls State
   const [selectedBlueprintKey, setSelectedBlueprintKey] = useState<string>(activeBlueprintId);
-  const [blueprintOpacity, setBlueprintOpacity] = useState<number>(0.85);
+  const [blueprintOpacity, setBlueprintOpacity] = useState<number>(0.9);
   const [showGrid, setShowGrid] = useState<boolean>(true);
-  const [showDimensions, setShowDimensions] = useState<boolean>(true);
-  const [showConduits, setShowConduits] = useState<boolean>(true);
   const [showWaveRings, setShowWaveRings] = useState<boolean>(true);
   const [showConduitGlow, setShowConduitGlow] = useState<boolean>(true);
   const [showHulls, setShowHulls] = useState<boolean>(true);
   const [isToolbarOpen, setIsToolbarOpen] = useState<boolean>(false);
 
-  // Auto-switch blueprint when nodes match logistics
+  // Sync blueprint preset when scenario changes
   useEffect(() => {
-    const isLogistics = nodes.some(n => n.id.includes('node_log_'));
-    if (isLogistics) {
-      setSelectedBlueprintKey('smart_logistics');
-    } else {
-      setSelectedBlueprintKey('campus_academic_wing');
-    }
-  }, [nodes]);
+    setSelectedBlueprintKey(activeBlueprintId);
+  }, [activeBlueprintId]);
 
-  // Effect Buffers
   const waveEffects = useRef<WaveEffect[]>([]);
   const dropBursts = useRef<DropBurst[]>([]);
   const ackParticles = useRef<AckParticle[]>([]);
   const prevPacketHops = useRef<Map<string, number>>(new Map());
 
-  // Convex Hull algorithm
   const getConvexHull = (pts: Array<{ x: number; y: number }>) => {
     if (pts.length < 3) return pts;
-    const sorted = [...pts].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+    const sorted = [...pts].sort((a, b) => (a.x !== b.x ? a.x - b.x : a.y - b.y));
     const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
       (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-
     const lower: typeof pts = [];
     for (const p of sorted) {
       while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
@@ -133,37 +120,44 @@ export const TopologyCanvas: React.FC<Props> = ({
     return lower.concat(upper);
   };
 
-  const screenToWorld = useCallback((cx: number, cy: number) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
-    const r = canvasRef.current.getBoundingClientRect();
-    return {
-      x: (cx - r.left - transform.x) / transform.scale,
-      y: (cy - r.top - transform.y) / transform.scale
-    };
-  }, [transform]);
+  const screenToWorld = useCallback(
+    (cx: number, cy: number) => {
+      if (!canvasRef.current) return { x: 0, y: 0 };
+      const r = canvasRef.current.getBoundingClientRect();
+      return {
+        x: (cx - r.left - transform.x) / transform.scale,
+        y: (cy - r.top - transform.y) / transform.scale,
+      };
+    },
+    [transform]
+  );
 
-  // Fit and center view
+  // Fit blueprint cleanly inside the open safe area to the right of left HUD
   const handleFitView = useCallback(() => {
-    if (!canvasRef.current) return;
-    const cw = canvasRef.current.clientWidth;
-    const ch = canvasRef.current.clientHeight;
-    if (cw === 0 || ch === 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const leftPadding = isPresentationMode ? 40 : 330;
+    const availW = Math.max(canvas.width - leftPadding - 40, 400);
+    const availH = Math.max(canvas.height - 150, 320);
+    const bpW = 920;
+    const bpH = 540;
+    const scale = Math.min(availW / bpW, availH / bpH, 1.05);
+    const offsetX = leftPadding + (availW - bpW * scale) / 2 - 60 * scale;
+    const offsetY = 60 + (availH - bpH * scale) / 2 - 70 * scale;
+    setTransform({ x: Math.round(offsetX), y: Math.round(offsetY), scale: Number(scale.toFixed(2)) });
+  }, [isPresentationMode]);
 
-    // Default bounds covering the architectural blueprint (1040 x 680)
-    const targetW = 1040;
-    const targetH = 680;
-    const scale = Math.min((cw - 80) / targetW, (ch - 80) / targetH, 1.2);
-    const x = (cw - targetW * scale) / 2;
-    const y = (ch - targetH * scale) / 2;
-    setTransform({ x: Math.max(x, 20), y: Math.max(y, 20), scale: Math.max(scale, 0.6) });
-  }, []);
+  // Auto-fit once on initial mount after canvas measures
+  useEffect(() => {
+    const timer = setTimeout(handleFitView, 80);
+    return () => clearTimeout(timer);
+  }, [handleFitView]);
 
-  // Detect packet events: hops -> radio waves, delivered -> ACK, dropped -> drop burst
+  // Detect hop, delivery, and drop events
   useEffect(() => {
     for (const pkt of activePackets) {
       const prevHops = prevPacketHops.current.get(pkt.id) ?? 0;
 
-      // New hop transmission
       if (pkt.hops > prevHops && pkt.state === 'transmitting') {
         const hopNode = nodes.find(n => n.id === pkt.currentHop);
         const sm = hopNode ? submeshes.find(s => s.id === hopNode.submeshId) : null;
@@ -172,15 +166,13 @@ export const TopologyCanvas: React.FC<Props> = ({
             x: hopNode.position.x,
             y: hopNode.position.y,
             startTime: performance.now(),
-            maxRadius: 130,
-            color: sm?.color || '#38BDF8',
-            frequencyBand: sm?.frequencyBand || '2.4GHz'
+            maxRadius: hopNode.type === 'gateway' ? 115 : 85,
+            color: sm?.color || '#2563EB',
           });
         }
       }
       prevPacketHops.current.set(pkt.id, pkt.hops);
 
-      // Packet delivered -> ACK return pulse
       if (pkt.state === 'received' && prevHops !== -1) {
         const srcN = nodes.find(n => n.id === pkt.src);
         const dstN = nodes.find(n => n.id === pkt.dst);
@@ -191,32 +183,29 @@ export const TopologyCanvas: React.FC<Props> = ({
             dx: srcN.position.x,
             dy: srcN.position.y,
             startTime: performance.now(),
-            color: '#10B981'
           });
         }
         prevPacketHops.current.set(pkt.id, -1);
       }
 
-      // Packet dropped -> drop burst shockwave
       if (pkt.state === 'dropped' && prevHops >= 0) {
-        const dropNode = nodes.find(n => n.id === pkt.currentHop) || nodes.find(n => n.id === pkt.src);
+        const dropNode = nodes.find(n => n.id === pkt.currentHop);
         if (dropNode) {
-          const sparks = Array.from({ length: 8 }, () => {
+          const sparks = Array.from({ length: 10 }, () => {
             const angle = Math.random() * Math.PI * 2;
-            const spd = 20 + Math.random() * 45;
+            const spd = 20 + Math.random() * 40;
             return {
               vx: Math.cos(angle) * spd,
               vy: Math.sin(angle) * spd,
-              color: Math.random() > 0.5 ? '#EF4444' : '#F59E0B'
+              color: Math.random() > 0.5 ? '#DC2626' : '#D97706',
             };
           });
-
           dropBursts.current.push({
             x: dropNode.position.x,
             y: dropNode.position.y,
             startTime: performance.now(),
-            reason: pkt.dropReason || 'RF Attenuation Drop',
-            sparks
+            reason: pkt.dropReason || 'RF Drop',
+            sparks,
           });
         }
         prevPacketHops.current.set(pkt.id, -1);
@@ -224,7 +213,7 @@ export const TopologyCanvas: React.FC<Props> = ({
     }
   }, [activePackets, nodes, submeshes, showWaveRings]);
 
-  // Main 60 FPS Render Loop
+  // 60 FPS Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -266,44 +255,38 @@ export const TopologyCanvas: React.FC<Props> = ({
       const currentBlueprint: BlueprintFloorPlan | null =
         selectedBlueprintKey === 'none' ? null : BLUEPRINT_PRESETS[selectedBlueprintKey] || CAMPUS_ACADEMIC_BLUEPRINT;
 
-      // 1. Dark Neomorphic Canvas Background (#0B0F19)
-      ctx.fillStyle = '#0B0F19';
+      // 1. Soft Neomorphic Canvas Drafting Surface
+      ctx.fillStyle = isDarkTheme ? '#1F2534' : '#E0E6F0';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
       ctx.translate(transform.x, transform.y);
       ctx.scale(transform.scale, transform.scale);
 
-      // 2. High-Tech Blueprint Faint Grid Background (Always active across viewport)
-      const gridSize = 40;
-      const sx = -transform.x / transform.scale - 100;
-      const sy = -transform.y / transform.scale - 100;
-      const ex = sx + canvas.width / transform.scale + 200;
-      const ey = sy + canvas.height / transform.scale + 200;
-
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.04)';
-      ctx.lineWidth = 1 / transform.scale;
-      ctx.beginPath();
-      for (let x = Math.floor(sx / gridSize) * gridSize; x <= ex; x += gridSize) {
-        ctx.moveTo(x, sy);
-        ctx.lineTo(x, ey);
+      // 2. Subtle Drafting Dots Background
+      if (showGrid) {
+        const dotStep = 40;
+        const sx = -transform.x / transform.scale - 80;
+        const sy = -transform.y / transform.scale - 80;
+        const ex = sx + canvas.width / transform.scale + 160;
+        const ey = sy + canvas.height / transform.scale + 160;
+        ctx.fillStyle = isDarkTheme ? 'rgba(148, 163, 184, 0.14)' : 'rgba(100, 116, 139, 0.22)';
+        for (let gx = Math.floor(sx / dotStep) * dotStep; gx <= ex; gx += dotStep) {
+          for (let gy = Math.floor(sy / dotStep) * dotStep; gy <= ey; gy += dotStep) {
+            ctx.fillRect(gx - 0.75, gy - 0.75, 1.5, 1.5);
+          }
+        }
       }
-      for (let y = Math.floor(sy / gridSize) * gridSize; y <= ey; y += gridSize) {
-        ctx.moveTo(sx, y);
-        ctx.lineTo(ex, y);
-      }
-      ctx.stroke();
 
-      // 3. Render Architectural CAD Blueprint Floor Plan
+      // 3. Clean Architectural Floor Sketch
       if (currentBlueprint && blueprintOpacity > 0) {
         drawBlueprintFloorPlan(ctx, currentBlueprint, blueprintOpacity, {
-          showGrid,
-          showDimensions,
-          showConduits
+          showGrid: false,
+          isDark: isDarkTheme,
         });
       }
 
-      // 4. Sub-Mesh Domain Convex Hulls
+      // 4. Sub-Mesh Domain Soft Perimeter Hulls
       if (showHulls) {
         for (const sm of submeshes) {
           const smNodes = nodes.filter(n => n.submeshId === sm.id);
@@ -319,31 +302,23 @@ export const TopologyCanvas: React.FC<Props> = ({
           for (let i = 1; i < hull.length; i++) ctx.lineTo(hull[i].x, hull[i].y);
           ctx.closePath();
 
-          // Outer halo
-          ctx.lineWidth = 42;
-          ctx.strokeStyle = sm.color + '0A';
+          ctx.lineWidth = 34;
+          ctx.strokeStyle = sm.color + (isDarkTheme ? '12' : '14');
           ctx.stroke();
-
-          // Soft translucent body
-          ctx.lineWidth = 18;
-          ctx.strokeStyle = sm.color + '12';
-          ctx.stroke();
-          ctx.fillStyle = sm.color + '07';
+          ctx.fillStyle = sm.color + (isDarkTheme ? '0A' : '0C');
           ctx.fill();
 
-          // Domain Header Badge
           const avgX = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-          const minY = Math.min(...pts.map(p => p.y)) - 28;
-
-          ctx.fillStyle = sm.color + 'CC';
+          const minY = Math.min(...pts.map(p => p.y)) - 30;
+          ctx.fillStyle = sm.color;
           ctx.font = '700 9.5px "JetBrains Mono", monospace';
           ctx.textAlign = 'center';
-          ctx.fillText(`⌁ ${sm.protocol} • ${sm.name} [${sm.frequencyBand}]`, avgX, minY);
+          ctx.fillText(`${sm.protocol} • ${sm.name} [${sm.frequencyBand}]`, avgX, minY);
           ctx.restore();
         }
       }
 
-      // 5. Network Links & Glowing Conduit Beams
+      // 5. Wireless Links & Active Glowing Conduits
       for (const link of links) {
         const sn = nodes.find(n => n.id === link.source);
         const dn = nodes.find(n => n.id === link.target);
@@ -359,67 +334,62 @@ export const TopologyCanvas: React.FC<Props> = ({
         ctx.lineTo(dn.position.x, dn.position.y);
 
         if (link.isSevered) {
-          // Severed Faulted Link
-          ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
-          ctx.lineWidth = 1.6;
+          ctx.strokeStyle = 'rgba(220, 38, 38, 0.75)';
+          ctx.lineWidth = 1.8;
           ctx.setLineDash([5, 5]);
           ctx.stroke();
 
           const mx = (sn.position.x + dn.position.x) / 2;
           const my = (sn.position.y + dn.position.y) / 2;
-          ctx.fillStyle = '#EF4444';
-          ctx.font = 'bold 12px sans-serif';
+          ctx.fillStyle = '#DC2626';
+          ctx.font = 'bold 13px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('✕', mx, my);
         } else if (link.isJammed) {
-          // Jammed Link
-          ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)';
+          ctx.strokeStyle = 'rgba(217, 119, 6, 0.75)';
           ctx.lineWidth = 2.2;
           ctx.setLineDash([4, 4]);
           ctx.stroke();
         } else if (isActive && showConduitGlow) {
-          // Glowing Active Conduit Beam (#06B6D4 for intra-domain, #F59E0B for cross-domain gateway)
-          const beamColor = isInterDomain ? '#F59E0B' : '#06B6D4';
-
-          // Outer soft glow aura
+          const beamColor = isInterDomain ? '#D97706' : '#0891B2';
           ctx.strokeStyle = beamColor + '66';
-          ctx.lineWidth = 6;
+          ctx.lineWidth = 6.5;
           ctx.shadowColor = beamColor;
-          ctx.shadowBlur = 18;
+          ctx.shadowBlur = 14;
           ctx.stroke();
 
-          // Intense core beam
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = isDarkTheme ? '#E0F2FE' : '#06B6D4';
+          ctx.lineWidth = 2;
           ctx.stroke();
           ctx.shadowBlur = 0;
 
-          // Traveling photon energy pulse
-          const t = ((now / 550) % 1);
+          const t = (now / 550) % 1;
           const px = sn.position.x + (dn.position.x - sn.position.x) * t;
           const py = sn.position.y + (dn.position.y - sn.position.y) * t;
-
-          const g = ctx.createRadialGradient(px, py, 0, px, py, 12);
+          const g = ctx.createRadialGradient(px, py, 0, px, py, 10);
           g.addColorStop(0, '#FFFFFF');
-          g.addColorStop(0.3, beamColor);
+          g.addColorStop(0.35, beamColor);
           g.addColorStop(1, 'transparent');
           ctx.fillStyle = g;
           ctx.beginPath();
-          ctx.arc(px, py, 12, 0, Math.PI * 2);
+          ctx.arc(px, py, 10, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          // Idle Link
-          ctx.strokeStyle = isInterDomain ? 'rgba(245, 158, 11, 0.28)' : 'rgba(56, 189, 248, 0.18)';
-          ctx.lineWidth = isInterDomain ? 1.8 : 1.2;
-          if (isInterDomain) ctx.setLineDash([6, 3]);
+          if (isInterDomain) {
+            ctx.strokeStyle = isDarkTheme ? 'rgba(245, 158, 11, 0.45)' : 'rgba(217, 119, 6, 0.55)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+          } else {
+            ctx.strokeStyle = isDarkTheme ? 'rgba(148, 163, 184, 0.25)' : 'rgba(100, 116, 139, 0.32)';
+            ctx.lineWidth = 1.5;
+          }
           ctx.stroke();
         }
 
-        // Link Selection Halo
         if (isSelected) {
-          ctx.strokeStyle = '#38BDF8';
-          ctx.lineWidth = 2.8;
+          ctx.strokeStyle = '#2563EB';
+          ctx.lineWidth = 3;
           ctx.setLineDash([]);
           ctx.beginPath();
           ctx.moveTo(sn.position.x, sn.position.y);
@@ -430,7 +400,7 @@ export const TopologyCanvas: React.FC<Props> = ({
         ctx.restore();
       }
 
-      // 6. Dynamic RF Radio Wave Propagation Rings
+      // 6. Radio Wave Propagation Rings
       if (showWaveRings) {
         waveEffects.current = waveEffects.current.filter(w => now - w.startTime < 1000);
         for (const w of waveEffects.current) {
@@ -439,71 +409,44 @@ export const TopologyCanvas: React.FC<Props> = ({
           const alpha = Math.max(0, 0.45 * (1 - elapsed));
 
           ctx.save();
-
-          // Primary Wave Ring
           ctx.beginPath();
           ctx.arc(w.x, w.y, radius, 0, Math.PI * 2);
           ctx.strokeStyle = w.color + Math.round(alpha * 255).toString(16).padStart(2, '0');
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 1.8;
           ctx.stroke();
-
-          // Secondary harmonic sub-ring (frequency ripple effect)
-          if (radius > 20) {
-            ctx.beginPath();
-            ctx.arc(w.x, w.y, radius * 0.72, 0, Math.PI * 2);
-            ctx.strokeStyle = w.color + Math.round(alpha * 0.5 * 255).toString(16).padStart(2, '0');
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-
-          if (radius > 45) {
-            ctx.beginPath();
-            ctx.arc(w.x, w.y, radius * 0.45, 0, Math.PI * 2);
-            ctx.strokeStyle = w.color + Math.round(alpha * 0.25 * 255).toString(16).padStart(2, '0');
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-          }
-
           ctx.restore();
         }
       }
 
-      // 7. Drop Bursts with Shockwaves & Radiant Sparks
+      // 7. Drop Bursts
       dropBursts.current = dropBursts.current.filter(d => now - d.startTime < 1300);
       for (const d of dropBursts.current) {
         const elapsed = (now - d.startTime) / 1300;
-        const radius = 8 + elapsed * 36;
+        const radius = 8 + elapsed * 34;
         const alpha = Math.max(0, 1 - elapsed);
 
         ctx.save();
-
-        // Expanding shockwave circle
         ctx.beginPath();
         ctx.arc(d.x, d.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(239, 68, 68, ${alpha * 0.22})`;
+        ctx.fillStyle = `rgba(220, 38, 38, ${alpha * 0.2})`;
         ctx.fill();
-        ctx.strokeStyle = `rgba(239, 68, 68, ${alpha})`;
-        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = `rgba(220, 38, 38, ${alpha})`;
+        ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Radiating debris sparks
         for (const sp of d.sparks) {
-          const sx = d.x + sp.vx * elapsed;
-          const sy = d.y + sp.vy * elapsed;
           ctx.fillStyle = sp.color;
           ctx.beginPath();
-          ctx.arc(sx, sy, Math.max(1, 2.5 * (1 - elapsed)), 0, Math.PI * 2);
+          ctx.arc(d.x + sp.vx * elapsed, d.y + sp.vy * elapsed, Math.max(1, 2.5 * (1 - elapsed)), 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Drop warning label
         if (elapsed < 0.75) {
-          ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
+          ctx.fillStyle = `rgba(220, 38, 38, ${alpha})`;
           ctx.font = '700 9px "JetBrains Mono", monospace';
           ctx.textAlign = 'center';
           ctx.fillText(`DROP: ${d.reason}`, d.x, d.y - radius - 6);
         }
-
         ctx.restore();
       }
 
@@ -518,20 +461,15 @@ export const TopologyCanvas: React.FC<Props> = ({
         ctx.save();
         const g = ctx.createRadialGradient(ax, ay, 0, ax, ay, 9);
         g.addColorStop(0, '#FFFFFF');
-        g.addColorStop(0.3, '#10B981');
+        g.addColorStop(0.35, '#059669');
         g.addColorStop(1, 'transparent');
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(ax, ay, 9, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(ax, ay, 2.8, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (t < 0.4) {
-          ctx.fillStyle = '#10B981';
+        if (t < 0.45) {
+          ctx.fillStyle = '#059669';
           ctx.font = '700 8.5px "JetBrains Mono", monospace';
           ctx.textAlign = 'center';
           ctx.fillText('ACK ✓', ax, ay - 11);
@@ -539,13 +477,11 @@ export const TopologyCanvas: React.FC<Props> = ({
         ctx.restore();
       }
 
-      // 9. Packet Particles with Trails & Gateway Translation Tags
+      // 9. Packet Particles & Gateway Translation Tag
       for (const pkt of activePackets) {
         if (pkt.state !== 'transmitting') continue;
-
         let sn: MeshNode | undefined;
         let dn: MeshNode | undefined;
-
         if (pkt.pathTraversed.length >= 2) {
           sn = nodes.find(n => n.id === pkt.pathTraversed[pkt.pathTraversed.length - 2]);
           dn = nodes.find(n => n.id === pkt.currentHop);
@@ -553,175 +489,149 @@ export const TopologyCanvas: React.FC<Props> = ({
           sn = nodes.find(n => n.id === pkt.src);
           dn = nodes.find(n => n.id === (pkt.nextHop || pkt.currentHop));
         }
-
         if (!sn || !dn) continue;
 
-        const t = ((now / 600) % 1);
+        const t = (now / 600) % 1;
         const px = sn.position.x + (dn.position.x - sn.position.x) * t;
         const py = sn.position.y + (dn.position.y - sn.position.y) * t;
-        const color = pkt.color || '#38BDF8';
+        const color = pkt.color || '#2563EB';
         const isGatewayHop = sn.type === 'gateway' || dn.type === 'gateway';
 
         ctx.save();
-
-        // Multi-segment comet trail
         for (let i = 1; i <= 5; i++) {
           const tt = Math.max(0, t - i * 0.05);
-          const tx = sn.position.x + (dn.position.x - sn.position.x) * tt;
-          const ty = sn.position.y + (dn.position.y - sn.position.y) * tt;
           ctx.fillStyle = color;
-          ctx.globalAlpha = 0.22 * (1 - i / 6);
+          ctx.globalAlpha = 0.25 * (1 - i / 6);
           ctx.beginPath();
-          ctx.arc(tx, ty, Math.max(1.5, 4.5 - i * 0.6), 0, Math.PI * 2);
+          ctx.arc(sn.position.x + (dn.position.x - sn.position.x) * tt, sn.position.y + (dn.position.y - sn.position.y) * tt, Math.max(1.5, 4.5 - i * 0.6), 0, Math.PI * 2);
           ctx.fill();
         }
 
-        ctx.globalAlpha = 1.0;
-
-        // Core glow
-        const glow = ctx.createRadialGradient(px, py, 0, px, py, 14);
+        ctx.globalAlpha = 1;
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, 13);
         glow.addColorStop(0, '#FFFFFF');
-        glow.addColorStop(0.3, color);
+        glow.addColorStop(0.35, color);
         glow.addColorStop(1, 'transparent');
         ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.arc(px, py, 13, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(px, py, 3.8, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Packet ID label
-        ctx.fillStyle = '#E2E8F0';
+        ctx.fillStyle = isDarkTheme ? '#E2E8F0' : '#1E293B';
         ctx.font = '700 8.5px "JetBrains Mono", monospace';
         ctx.textAlign = 'left';
         ctx.fillText(pkt.id, px + 9, py - 4);
 
-        // Gateway Translation Tag when crossing or at gateway
         if (isGatewayHop) {
-          const tagW = 105;
-          const tagH = 17;
+          const tagW = 112;
+          const tagH = 18;
           const tagX = px - tagW / 2;
           const tagY = py - 26;
-
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-          ctx.strokeStyle = '#F59E0B';
+          ctx.fillStyle = isDarkTheme ? '#1F2534' : '#EDF1F8';
+          ctx.strokeStyle = '#D97706';
           ctx.lineWidth = 1.2;
           ctx.fillRect(tagX, tagY, tagW, tagH);
           ctx.strokeRect(tagX, tagY, tagW, tagH);
 
-          ctx.fillStyle = '#F59E0B';
+          ctx.fillStyle = '#D97706';
           ctx.font = '700 8px "JetBrains Mono", monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('⟡ GW: HWMP ➔ RPL', tagX + tagW / 2, tagY + tagH / 2);
         }
-
         ctx.restore();
       }
 
-      // 10. Nodes Rendering
+      // 10. Tactile Neomorphic Nodes
       for (const node of nodes) {
         const isSel = selectedNodeId === node.id;
         const sm = submeshes.find(s => s.id === node.submeshId);
-        const color = sm?.color || '#3B82F6';
-        const r = node.type === 'gateway' ? 18 : node.type === 'router' ? 15 : 12;
+        const accentColor = sm?.color || '#2563EB';
+        const r = node.type === 'gateway' ? 18 : node.type === 'router' ? 15 : 13;
 
         ctx.save();
 
-        // Selection & Range ring
         if (isSel && node.isAlive) {
           ctx.beginPath();
-          ctx.arc(node.position.x, node.position.y, r + 8, 0, Math.PI * 2);
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 1.6;
-          ctx.setLineDash([4, 4]);
+          ctx.arc(node.position.x, node.position.y, r + 7, 0, Math.PI * 2);
+          ctx.strokeStyle = accentColor;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 3]);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Radio coverage range
           ctx.beginPath();
-          ctx.arc(node.position.x, node.position.y, 130, 0, Math.PI * 2);
-          ctx.fillStyle = color + '08';
+          ctx.arc(node.position.x, node.position.y, 125, 0, Math.PI * 2);
+          ctx.fillStyle = accentColor + '0A';
           ctx.fill();
-          ctx.strokeStyle = color + '28';
-          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = accentColor + '28';
+          ctx.lineWidth = 1;
           ctx.stroke();
         }
 
-        // Neomorphic Drop-Shadow Base
-        ctx.beginPath();
-        ctx.arc(node.position.x + 2, node.position.y + 2, r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fill();
+        // Tactile dual-shadow neomorphic disc
+        ctx.shadowColor = isDarkTheme ? 'rgba(10, 13, 20, 0.7)' : 'rgba(148, 163, 184, 0.65)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 4;
+        ctx.shadowOffsetY = 4;
 
-        // Node Body
         ctx.beginPath();
         ctx.arc(node.position.x, node.position.y, r, 0, Math.PI * 2);
-
-        if (!node.isAlive) {
-          ctx.fillStyle = '#1E293B';
-          ctx.strokeStyle = '#EF4444';
-          ctx.lineWidth = 2;
-        } else if (node.type === 'gateway') {
-          // Gateway (Dual gold aura)
-          const grad = ctx.createRadialGradient(node.position.x, node.position.y, 2, node.position.x, node.position.y, r);
-          grad.addColorStop(0, '#FBBF24');
-          grad.addColorStop(1, '#D97706');
-          ctx.fillStyle = grad;
-          ctx.strokeStyle = '#FEF3C7';
-          ctx.lineWidth = 2;
-          ctx.shadowColor = '#F59E0B';
-          ctx.shadowBlur = isSel ? 20 : 10;
-        } else if (node.type === 'mobile') {
-          // Mobile Unit (Cyan gradient)
-          const grad = ctx.createRadialGradient(node.position.x, node.position.y, 2, node.position.x, node.position.y, r);
-          grad.addColorStop(0, '#38BDF8');
-          grad.addColorStop(1, '#0284C7');
-          ctx.fillStyle = grad;
-          ctx.strokeStyle = '#E0F2FE';
-          ctx.lineWidth = 1.8;
-          ctx.shadowColor = '#06B6D4';
-          ctx.shadowBlur = isSel ? 16 : 8;
-        } else {
-          // Standard Router / Sensor
-          const grad = ctx.createRadialGradient(node.position.x, node.position.y, 2, node.position.x, node.position.y, r);
-          grad.addColorStop(0, color);
-          grad.addColorStop(1, '#0F172A');
-          ctx.fillStyle = grad;
-          ctx.strokeStyle = '#FFFFFF40';
-          ctx.lineWidth = 1.5;
-          ctx.shadowColor = color;
-          ctx.shadowBlur = isSel ? 14 : 6;
-        }
-
+        ctx.fillStyle = isDarkTheme ? '#283042' : '#EBF0F7';
         ctx.fill();
+
+        // Top-left soft highlight rim
+        ctx.shadowColor = isDarkTheme ? 'rgba(55, 65, 88, 0.6)' : 'rgba(255, 255, 255, 0.95)';
+        ctx.shadowOffsetX = -3;
+        ctx.shadowOffsetY = -3;
+        ctx.shadowBlur = 6;
+        ctx.strokeStyle = !node.isAlive
+          ? '#DC2626'
+          : node.type === 'gateway'
+          ? '#D97706'
+          : accentColor;
+        ctx.lineWidth = node.type === 'gateway' ? 3 : 2.5;
         ctx.stroke();
         ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
 
-        // Glyph Symbol
+        // Colored Inner Core
+        const coreR = r - 5;
+        ctx.beginPath();
+        ctx.arc(node.position.x, node.position.y, coreR, 0, Math.PI * 2);
+        ctx.fillStyle = !node.isAlive
+          ? '#64748B'
+          : node.type === 'gateway'
+          ? '#D97706'
+          : node.type === 'mobile'
+          ? '#0891B2'
+          : accentColor;
+        ctx.fill();
+
+        // Glyph
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = `bold ${r > 15 ? 12 : 9}px sans-serif`;
+        ctx.font = `bold ${r > 15 ? 10 : 8.5}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const glyph = node.type === 'gateway' ? '⟡' : node.type === 'router' ? '△' : node.type === 'mobile' ? '✦' : '●';
-        ctx.fillText(glyph, node.position.x, node.position.y);
+        ctx.fillText(glyph, node.position.x, node.position.y + 0.5);
 
-        // Node Label with Neomorphic Backing
+        // Clean Neomorphic Label Pill
         ctx.font = '600 9.5px "Inter", sans-serif';
         const labelText = node.name;
         const lw = ctx.measureText(labelText).width;
         const ly = node.position.y + r + 13;
 
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-        ctx.fillRect(node.position.x - lw / 2 - 4, ly - 6, lw + 8, 13);
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.fillStyle = isDarkTheme ? 'rgba(30, 36, 50, 0.92)' : 'rgba(241, 245, 250, 0.94)';
+        ctx.strokeStyle = isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(148,163,184,0.35)';
         ctx.lineWidth = 0.8;
-        ctx.strokeRect(node.position.x - lw / 2 - 4, ly - 6, lw + 8, 13);
+        ctx.beginPath();
+        ctx.roundRect(node.position.x - lw / 2 - 5, ly - 7, lw + 10, 14, 5);
+        ctx.fill();
+        ctx.stroke();
 
-        ctx.fillStyle = node.isAlive ? '#E2E8F0' : '#64748B';
+        ctx.fillStyle = node.isAlive ? (isDarkTheme ? '#F1F5F9' : '#1E293B') : '#94A3B8';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(labelText, node.position.x, ly);
@@ -729,18 +639,14 @@ export const TopologyCanvas: React.FC<Props> = ({
         // Queue Micro-Gauge
         if (node.isAlive && node.queueCapacity > 0) {
           const qf = node.currentQueue.length / node.queueCapacity;
-          const gw = 26;
-          const gh = 3.5;
+          const gw = 24;
+          const gh = 3;
           const gx = node.position.x - gw / 2;
           const gy = node.position.y - r - 8;
-
-          ctx.fillStyle = '#0F172A';
-          ctx.fillRect(gx - 1, gy - 1, gw + 2, gh + 2);
-          ctx.fillStyle = '#334155';
+          ctx.fillStyle = isDarkTheme ? '#181D29' : '#CBD5E1';
           ctx.fillRect(gx, gy, gw, gh);
-
           if (qf > 0) {
-            ctx.fillStyle = qf > 0.8 ? '#EF4444' : qf > 0.4 ? '#F59E0B' : '#10B981';
+            ctx.fillStyle = qf > 0.8 ? '#DC2626' : qf > 0.4 ? '#D97706' : '#059669';
             ctx.fillRect(gx, gy, gw * qf, gh);
           }
         }
@@ -765,18 +671,15 @@ export const TopologyCanvas: React.FC<Props> = ({
     selectedBlueprintKey,
     blueprintOpacity,
     showGrid,
-    showDimensions,
-    showConduits,
     showWaveRings,
     showConduitGlow,
-    showHulls
+    showHulls,
+    highlightedRoute,
+    isDarkTheme,
   ]);
 
-  // Mouse Interaction handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const wp = screenToWorld(e.clientX, e.clientY);
-
-    // Click on node?
     for (const node of nodes) {
       const r = node.type === 'gateway' ? 22 : 18;
       if (Math.hypot(node.position.x - wp.x, node.position.y - wp.y) <= r) {
@@ -786,21 +689,13 @@ export const TopologyCanvas: React.FC<Props> = ({
         return;
       }
     }
-
-    // Click on link?
     for (const link of links) {
       const sn = nodes.find(n => n.id === link.source);
       const dn = nodes.find(n => n.id === link.target);
       if (!sn || !dn) continue;
       const l2 = Math.hypot(sn.position.x - dn.position.x, sn.position.y - dn.position.y) ** 2;
       if (l2 === 0) continue;
-      const t = Math.max(
-        0,
-        Math.min(
-          1,
-          ((wp.x - sn.position.x) * (dn.position.x - sn.position.x) + (wp.y - sn.position.y) * (dn.position.y - sn.position.y)) / l2
-        )
-      );
+      const t = Math.max(0, Math.min(1, ((wp.x - sn.position.x) * (dn.position.x - sn.position.x) + (wp.y - sn.position.y) * (dn.position.y - sn.position.y)) / l2));
       const px = sn.position.x + t * (dn.position.x - sn.position.x);
       const py = sn.position.y + t * (dn.position.y - sn.position.y);
       if (Math.hypot(wp.x - px, wp.y - py) <= 12) {
@@ -809,8 +704,6 @@ export const TopologyCanvas: React.FC<Props> = ({
         return;
       }
     }
-
-    // Drag canvas
     isDraggingCanvas.current = true;
     dragStart.current = { x: e.clientX - transform.x, y: e.clientY - transform.y };
     onSelectNode(null);
@@ -822,11 +715,7 @@ export const TopologyCanvas: React.FC<Props> = ({
       const wp = screenToWorld(e.clientX, e.clientY);
       onMoveNode(draggedNodeId.current, Math.round(wp.x), Math.round(wp.y));
     } else if (isDraggingCanvas.current) {
-      setTransform(p => ({
-        ...p,
-        x: e.clientX - dragStart.current.x,
-        y: e.clientY - dragStart.current.y
-      }));
+      setTransform(p => ({ ...p, x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }));
     }
   };
 
@@ -840,7 +729,6 @@ export const TopologyCanvas: React.FC<Props> = ({
     const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const r = canvas.getBoundingClientRect();
     const mx = e.clientX - r.left;
     const my = e.clientY - r.top;
@@ -849,16 +737,12 @@ export const TopologyCanvas: React.FC<Props> = ({
       const newScale = Math.min(Math.max(p.scale * zoomFactor, 0.3), 3.5);
       const wx = (mx - p.x) / p.scale;
       const wy = (my - p.y) / p.scale;
-      return {
-        scale: newScale,
-        x: mx - wx * newScale,
-        y: my - wy * newScale
-      };
+      return { scale: newScale, x: mx - wx * newScale, y: my - wy * newScale };
     });
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#0B0F19]">
+    <div className="relative w-full h-full overflow-hidden neu-base">
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
@@ -869,78 +753,69 @@ export const TopologyCanvas: React.FC<Props> = ({
         className="w-full h-full cursor-crosshair block"
       />
 
-      {/* Floating Neomorphic Blueprint Controls Toolbar (Top-Right) */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#161B26]/90 border border-slate-700/60 shadow-lg backdrop-blur-md">
+      {/* Top-Right Blueprint Controls Pill */}
+      <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-2">
+        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl neu-convex">
           <button
             onClick={() => setIsToolbarOpen(!isToolbarOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              isToolbarOpen
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-inner'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              isToolbarOpen ? 'neu-pressed text-sky-600 dark:text-cyan-400' : 'neu-button-sm text-neu-text'
             }`}
-            title="Toggle Blueprint Floor Plan Settings"
+            title="Floor Plan & Visual Layer Settings"
           >
-            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Blueprint HUD</span>
-            <span className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-cyan-300 font-mono">
+            <Sliders className="w-3.5 h-3.5 text-sky-600 dark:text-cyan-400" />
+            <span>Blueprint</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-md neu-pressed-sm text-sky-600 dark:text-cyan-400 font-mono font-bold">
               {Math.round(blueprintOpacity * 100)}%
             </span>
           </button>
 
           <button
             onClick={handleFitView}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
-            title="Fit / Center View"
+            className="p-1.5 rounded-xl neu-button-sm text-neu-muted hover:text-neu-text"
+            title="Fit Campus to View"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Expanded Blueprint Settings Panel */}
         {isToolbarOpen && (
-          <div className="w-72 p-3.5 rounded-2xl bg-[#161B26]/95 border border-slate-700/70 shadow-2xl backdrop-blur-xl flex flex-col gap-3 text-xs text-slate-200">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-700/50">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-100">
-                <Layers className="w-4 h-4 text-cyan-400" />
-                <span>Architectural Floor Plan</span>
+          <div className="w-72 p-4 rounded-2xl neu-convex flex flex-col gap-3 text-xs text-neu-text animate-fade-up">
+            <div className="flex items-center justify-between pb-2 border-b border-neu-border">
+              <div className="flex items-center gap-1.5 font-bold">
+                <Layers className="w-4 h-4 text-sky-600 dark:text-cyan-400" />
+                <span>2D Floor Plan Sketch</span>
               </div>
-              <span className="text-[10px] text-cyan-400/80 font-mono">2D CAD</span>
+              <span className="text-[10px] text-neu-muted font-mono">CAD</span>
             </div>
 
-            {/* Blueprint Selector */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-medium text-slate-400">Active Blueprint Scenario</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  onClick={() => setSelectedBlueprintKey('campus_academic_wing')}
-                  className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-medium transition-all ${
-                    selectedBlueprintKey === 'campus_academic_wing'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
-                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-800 border border-transparent'
-                  }`}
-                >
-                  MIT AOE Wing
-                </button>
-                <button
-                  onClick={() => setSelectedBlueprintKey('smart_logistics')}
-                  className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-medium transition-all ${
-                    selectedBlueprintKey === 'smart_logistics'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
-                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-800 border border-transparent'
-                  }`}
-                >
-                  Logistics Complex
-                </button>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-neu-muted">Map Preset</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { key: 'campus_academic_wing', label: 'Campus' },
+                  { key: 'smart_logistics', label: 'Logistics' },
+                  { key: 'none', label: 'Blank' },
+                ].map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setSelectedBlueprintKey(opt.key)}
+                    className={`px-2 py-1.5 rounded-xl text-[11px] font-semibold transition-all ${
+                      selectedBlueprintKey === opt.key
+                        ? 'neu-pressed text-sky-600 dark:text-cyan-300'
+                        : 'neu-button-sm text-neu-muted hover:text-neu-text'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Blueprint Opacity Slider (0% - 100%) */}
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between items-center text-[11px]">
-                <span className="text-slate-400">Blueprint Opacity</span>
-                <span className="text-cyan-400 font-mono font-semibold">
+                <span className="text-neu-muted font-medium">Sketch Opacity</span>
+                <span className="text-sky-600 dark:text-cyan-400 font-mono font-bold">
                   {Math.round(blueprintOpacity * 100)}%
                 </span>
               </div>
@@ -951,79 +826,28 @@ export const TopologyCanvas: React.FC<Props> = ({
                 step="0.05"
                 value={blueprintOpacity}
                 onChange={e => setBlueprintOpacity(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-slate-700/80 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                className="w-full accent-sky-600 cursor-pointer"
               />
             </div>
 
-            {/* Layer Toggles */}
-            <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-700/40">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Visual Layers</span>
-
-              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+            <div className="flex flex-col gap-2 pt-2 border-t border-neu-border">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-neu-muted">Overlays</span>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showGrid}
-                    onChange={e => setShowGrid(e.target.checked)}
-                    className="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0 w-3 h-3"
-                  />
-                  <span>CAD Grid</span>
+                  <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} className="accent-sky-600" />
+                  <span>Dot Grid</span>
                 </label>
-
                 <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showDimensions}
-                    onChange={e => setShowDimensions(e.target.checked)}
-                    className="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0 w-3 h-3"
-                  />
-                  <span>Dimensions</span>
+                  <input type="checkbox" checked={showHulls} onChange={e => setShowHulls(e.target.checked)} className="accent-sky-600" />
+                  <span>Sub-Mesh Hulls</span>
                 </label>
-
                 <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showConduits}
-                    onChange={e => setShowConduits(e.target.checked)}
-                    className="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0 w-3 h-3"
-                  />
-                  <span>Cable Trays</span>
+                  <input type="checkbox" checked={showWaveRings} onChange={e => setShowWaveRings(e.target.checked)} className="accent-sky-600" />
+                  <span className="flex items-center gap-1"><Radio className="w-3 h-3 text-sky-500" />RF Waves</span>
                 </label>
-
                 <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showWaveRings}
-                    onChange={e => setShowWaveRings(e.target.checked)}
-                    className="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0 w-3 h-3"
-                  />
-                  <span className="flex items-center gap-1">
-                    <Radio className="w-3 h-3 text-cyan-400" />
-                    RF Waves
-                  </span>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showConduitGlow}
-                    onChange={e => setShowConduitGlow(e.target.checked)}
-                    className="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0 w-3 h-3"
-                  />
-                  <span className="flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-amber-400" />
-                    Beam Glow
-                  </span>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showHulls}
-                    onChange={e => setShowHulls(e.target.checked)}
-                    className="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0 w-3 h-3"
-                  />
-                  <span>Domain Hulls</span>
+                  <input type="checkbox" checked={showConduitGlow} onChange={e => setShowConduitGlow(e.target.checked)} className="accent-sky-600" />
+                  <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" />Beam Glow</span>
                 </label>
               </div>
             </div>
@@ -1031,18 +855,18 @@ export const TopologyCanvas: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Floating Canvas Info Pill (Bottom-Left) */}
-      <div className="absolute bottom-4 left-4 z-10 flex items-center gap-3 px-3 py-1.5 rounded-xl bg-[#161B26]/85 border border-slate-700/50 backdrop-blur-md text-[11px] text-slate-300 font-mono shadow-md pointer-events-none">
-        <span className="flex items-center gap-1 text-cyan-400">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+      {/* Bottom-Left Compact Status Pill */}
+      <div className="absolute bottom-4 left-3 z-10 flex items-center gap-2.5 px-3 py-1.5 rounded-xl neu-convex-sm text-[11px] text-neu-muted font-mono pointer-events-none">
+        <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           60 FPS
         </span>
-        <span className="text-slate-500">•</span>
-        <span>Zoom: {Math.round(transform.scale * 100)}%</span>
-        <span className="text-slate-500">•</span>
-        <span>Nodes: {nodes.length}</span>
-        <span className="text-slate-500">•</span>
-        <span>Links: {links.length}</span>
+        <span>•</span>
+        <span>{Math.round(transform.scale * 100)}%</span>
+        <span>•</span>
+        <span>{nodes.length} Nodes</span>
+        <span>•</span>
+        <span>{links.length} Links</span>
       </div>
     </div>
   );

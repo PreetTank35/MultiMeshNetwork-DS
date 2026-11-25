@@ -32,55 +32,50 @@ export const FloatingPlayerBar: React.FC<Props> = ({
   onChangeSpeed,
   onInjectPacket,
   onToggle3D,
-  onAddNode
 }) => {
   const [termOpen, setTermOpen] = useState(false);
   const [injectOpen, setInjectOpen] = useState(false);
   const [srcId, setSrcId] = useState('');
   const [dstId, setDstId] = useState('');
-  const [payloadText, setPayloadText] = useState('Smart Sensor Telemetry');
   const speeds = [0.2, 0.5, 1.0, 2.0, 5.0];
   const aliveNodes = nodes.filter(n => n.isAlive);
 
   return (
-    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none select-none">
-      {/* Collapsible Neomorphic Live Event Console */}
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none select-none">
+      {/* Collapsible Live Event Terminal */}
       {termOpen && (
-        <div className="neu-convex rounded-2xl shadow-2xl mb-3 w-[660px] max-h-56 overflow-hidden pointer-events-auto border border-neu-border animate-fade-up">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-neu-border bg-neu-base/60">
+        <div className="neu-convex rounded-2xl mb-3 w-[640px] max-w-[90vw] max-h-52 overflow-hidden pointer-events-auto animate-fade-up">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-neu-border">
             <div className="flex items-center space-x-2">
-              <Terminal className="w-3.5 h-3.5 text-cyan-400 neu-led-route" />
-              <span className="text-[11px] font-mono font-semibold text-slate-200">
+              <Terminal className="w-3.5 h-3.5 text-sky-600 dark:text-cyan-400" />
+              <span className="text-[11px] font-mono font-bold text-neu-text">
                 Discrete-Event Trace Terminal ({logs.length} events)
               </span>
             </div>
-            <button
-              onClick={() => setTermOpen(false)}
-              className="p-1 rounded-lg neu-button-sm text-slate-400 hover:text-white"
-            >
+            <button onClick={() => setTermOpen(false)} className="p-1 rounded-lg neu-button-sm text-neu-muted hover:text-neu-text">
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="neu-pressed m-2 rounded-xl p-2.5 max-h-40 overflow-y-auto font-mono text-[10px] space-y-1 custom-scrollbar border border-black/30">
+          <div className="neu-pressed m-2 rounded-xl p-2.5 max-h-36 overflow-y-auto font-mono text-[10px] space-y-1 custom-scrollbar">
             {logs.length === 0 ? (
-              <div className="text-slate-500 py-6 text-center italic">
-                Ready for event emission. Inject a packet or resume playback to record discrete steps.
+              <div className="text-neu-muted py-5 text-center italic">
+                Ready for simulation events. Transmit a packet or press Play to record steps.
               </div>
             ) : (
               logs.slice(0, 80).map((log, i) => (
                 <div key={i} className="flex space-x-2 leading-relaxed items-baseline">
-                  <span className="text-cyan-500/70 select-none shrink-0 font-bold">[{log.timestamp}ms]</span>
+                  <span className="text-sky-600 dark:text-cyan-400 select-none shrink-0 font-bold">[{log.timestamp}ms]</span>
                   <span
                     className={
                       log.level === 'success'
-                        ? 'text-emerald-400'
+                        ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
                         : log.level === 'error'
-                        ? 'text-red-400 font-semibold'
+                        ? 'text-red-600 dark:text-red-400 font-semibold'
                         : log.level === 'warn'
-                        ? 'text-amber-400'
+                        ? 'text-amber-600 dark:text-amber-400'
                         : log.level === 'gateway'
-                        ? 'text-cyan-300 font-bold'
-                        : 'text-slate-300'
+                        ? 'text-sky-700 dark:text-cyan-300 font-bold'
+                        : 'text-neu-text'
                     }
                   >
                     {log.message}
@@ -92,103 +87,94 @@ export const FloatingPlayerBar: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Tactile Neomorphic Packet Injection Console */}
+      {/* Quick Packet Injection Console */}
       {injectOpen && (
-        <div className="neu-convex rounded-2xl shadow-2xl mb-3 p-4 pointer-events-auto border border-neu-border animate-fade-up w-[660px]">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs font-semibold text-slate-200 flex items-center space-x-2">
-              <Radio className="w-3.5 h-3.5 text-blue-400 neu-led-wifi" />
-              <span>Direct RF Packet Injection Engine</span>
+        <div className="neu-convex rounded-2xl mb-3 p-3.5 pointer-events-auto animate-fade-up w-[640px] max-w-[90vw]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-neu-text flex items-center space-x-2">
+              <Radio className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Quick RF Packet Injector</span>
             </span>
-            <span className="text-[10px] text-slate-400 font-mono">Cross-Domain L3 / MAC Flow</span>
+            <span className="text-[10px] text-neu-muted font-mono">Cross-Domain Dispatch</span>
           </div>
-          <div className="flex items-center space-x-2.5 text-xs">
-            <div className="neu-pressed rounded-xl p-1 flex-1 border border-black/20">
-              <select
-                value={srcId}
-                onChange={e => setSrcId(e.target.value)}
-                className="w-full bg-transparent px-2.5 py-1 text-slate-200 text-xs focus:outline-none font-mono"
-              >
-                <option value="" className="bg-neu-base text-slate-400">Select Source Node…</option>
-                {aliveNodes.map(n => (
-                  <option key={n.id} value={n.id} className="bg-neu-base text-slate-200">
-                    {n.name} ({submeshes.find(s => s.id === n.submeshId)?.name || 'Mesh'})
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="flex items-center space-x-2 text-xs">
+            <select
+              value={srcId}
+              onChange={e => setSrcId(e.target.value)}
+              className="flex-1 neu-select rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none"
+            >
+              <option value="">Select Source…</option>
+              {aliveNodes.map(n => (
+                <option key={n.id} value={n.id}>
+                  {n.name} ({submeshes.find(s => s.id === n.submeshId)?.protocol || 'Mesh'})
+                </option>
+              ))}
+            </select>
 
-            <span className="text-slate-500 font-bold text-sm">→</span>
+            <span className="text-neu-muted font-bold">→</span>
 
-            <div className="neu-pressed rounded-xl p-1 flex-1 border border-black/20">
-              <select
-                value={dstId}
-                onChange={e => setDstId(e.target.value)}
-                className="w-full bg-transparent px-2.5 py-1 text-slate-200 text-xs focus:outline-none font-mono"
-              >
-                <option value="" className="bg-neu-base text-slate-400">Select Destination…</option>
-                {aliveNodes.filter(n => n.id !== srcId).map(n => (
-                  <option key={n.id} value={n.id} className="bg-neu-base text-slate-200">
-                    {n.name} ({submeshes.find(s => s.id === n.submeshId)?.name || 'Mesh'})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={dstId}
+              onChange={e => setDstId(e.target.value)}
+              className="flex-1 neu-select rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none"
+            >
+              <option value="">Select Target…</option>
+              {aliveNodes.filter(n => n.id !== srcId).map(n => (
+                <option key={n.id} value={n.id}>
+                  {n.name} ({submeshes.find(s => s.id === n.submeshId)?.protocol || 'Mesh'})
+                </option>
+              ))}
+            </select>
 
             <button
               disabled={!srcId || !dstId}
               onClick={() => {
-                onInjectPacket(srcId, dstId, payloadText);
+                onInjectPacket(srcId, dstId, 'Smart Sensor Telemetry');
                 setInjectOpen(false);
               }}
-              className="neu-button px-4 py-2 rounded-xl text-white font-semibold text-xs transition-all flex items-center space-x-1.5 disabled:opacity-30 disabled:pointer-events-none hover:shadow-[0_0_15px_rgba(37,99,235,0.4)] text-blue-400"
+              className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all flex items-center space-x-1.5 disabled:opacity-40 shadow-md"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Emit Frame</span>
+              <span>Emit</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Floating Tactile Cockpit Dock */}
-      <div className="neu-convex rounded-2xl shadow-2xl px-3 py-2 flex items-center space-x-2 pointer-events-auto border border-neu-border">
-        {/* Play / Pause Tactile Button */}
+      {/* Main Tactile Floating Cockpit */}
+      <div className="neu-convex rounded-2xl px-2.5 py-1.5 flex items-center space-x-1.5 pointer-events-auto">
         <button
           onClick={onTogglePlay}
-          className={`p-2.5 rounded-xl transition-all ${
-            isRunning
-              ? 'neu-pressed text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(217,119,6,0.25)]'
-              : 'neu-button text-cyan-300 hover:text-white'
+          className={`p-2 rounded-xl transition-all ${
+            isRunning ? 'neu-pressed text-amber-600 dark:text-amber-300' : 'neu-button text-sky-600 dark:text-cyan-400'
           }`}
-          title={isRunning ? 'Pause Discrete Engine' : 'Resume Playback'}
+          title={isRunning ? 'Pause Simulation' : 'Play Simulation'}
         >
-          {isRunning ? <Pause className="w-4 h-4 fill-amber-300" /> : <Play className="w-4 h-4 fill-cyan-400 ml-0.5" />}
+          {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
         </button>
 
-        {/* Step Forward 1 Hop */}
         <button
           onClick={onStepForward}
           disabled={isRunning}
-          className="p-2.5 rounded-xl neu-button text-slate-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all"
-          title="Step +1 Discrete Hop (30ms delta)"
+          className="p-2 rounded-xl neu-button text-neu-muted hover:text-neu-text disabled:opacity-30 transition-all"
+          title="Step +1 Discrete Hop"
         >
           <SkipForward className="w-4 h-4" />
         </button>
 
-        <div className="w-px h-7 bg-slate-700/50 mx-1" />
+        <div className="w-px h-6 bg-neu-muted/20 mx-0.5" />
 
-        {/* Recessed Speed Multiplier Rail */}
-        <div className="flex items-center neu-pressed rounded-xl p-1 border border-black/20">
+        <div className="flex items-center neu-pressed rounded-xl p-1">
           {speeds.map(s => {
             const isSel = speedMultiplier === s;
             return (
               <button
                 key={s}
                 onClick={() => onChangeSpeed(s)}
-                className={`px-2 py-1 rounded-lg text-[10px] font-mono transition-all ${
+                className={`px-2 py-0.5 rounded-lg text-[10px] font-mono transition-all ${
                   isSel
-                    ? 'neu-button text-cyan-300 font-bold shadow-[0_0_8px_rgba(6,182,212,0.3)]'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'neu-button text-sky-600 dark:text-cyan-300 font-bold'
+                    : 'text-neu-muted hover:text-neu-text'
                 }`}
               >
                 {s}x
@@ -197,58 +183,44 @@ export const FloatingPlayerBar: React.FC<Props> = ({
           })}
         </div>
 
-        <div className="w-px h-7 bg-slate-700/50 mx-1" />
+        <div className="w-px h-6 bg-neu-muted/20 mx-0.5" />
 
-        {/* Digital LCD Clock Panel */}
-        <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl neu-pressed border border-black/20 text-xs font-mono">
-          <Clock className="w-3.5 h-3.5 text-cyan-400/80" />
-          <span className="text-cyan-300 font-bold tracking-wider tabular-nums">
-            {(simTimeMs / 1000).toFixed(2)}s
-          </span>
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isRunning ? 'bg-emerald-400 neu-led-iot animate-beacon' : 'bg-amber-400 neu-led-gateway'
-            }`}
-          />
+        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl neu-pressed text-xs font-mono">
+          <Clock className="w-3 h-3 text-sky-600 dark:text-cyan-400" />
+          <span className="text-neu-text font-bold tabular-nums">{(simTimeMs / 1000).toFixed(2)}s</span>
+          <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500 neu-led-iot animate-beacon' : 'bg-amber-500 neu-led-gateway'}`} />
         </div>
 
-        <div className="w-px h-7 bg-slate-700/50 mx-1" />
+        <div className="w-px h-6 bg-neu-muted/20 mx-0.5" />
 
-        {/* Action Buttons: Inject, 3D, Console */}
         <button
           onClick={() => setInjectOpen(!injectOpen)}
-          className={`p-2.5 rounded-xl transition-all ${
-            injectOpen
-              ? 'neu-pressed text-blue-400 border border-blue-500/30'
-              : 'neu-button text-slate-300 hover:text-blue-400'
+          className={`p-2 rounded-xl transition-all ${
+            injectOpen ? 'neu-pressed text-blue-600 dark:text-blue-400' : 'neu-button text-neu-muted hover:text-blue-600 dark:hover:text-blue-400'
           }`}
-          title="Inject RF Packet"
+          title="Quick Inject Packet"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-3.5 h-3.5" />
         </button>
 
         <button
           onClick={onToggle3D}
-          className={`p-2.5 rounded-xl transition-all ${
-            is3DMode
-              ? 'neu-pressed text-amber-300 border border-amber-500/30'
-              : 'neu-button text-slate-300 hover:text-amber-300'
+          className={`p-2 rounded-xl transition-all ${
+            is3DMode ? 'neu-pressed text-amber-600 dark:text-amber-300' : 'neu-button text-neu-muted hover:text-amber-600 dark:hover:text-amber-300'
           }`}
-          title={is3DMode ? 'Switch to 2D Blueprint Canvas' : 'Switch to 3D Isometric View'}
+          title={is3DMode ? 'Switch to 2D Blueprint' : 'Switch to 3D Isometric'}
         >
-          <Box className="w-4 h-4" />
+          <Box className="w-3.5 h-3.5" />
         </button>
 
         <button
           onClick={() => setTermOpen(!termOpen)}
-          className={`p-2.5 rounded-xl transition-all ${
-            termOpen
-              ? 'neu-pressed text-purple-300 border border-purple-500/30'
-              : 'neu-button text-slate-300 hover:text-purple-300'
+          className={`p-2 rounded-xl transition-all ${
+            termOpen ? 'neu-pressed text-purple-600 dark:text-purple-300' : 'neu-button text-neu-muted hover:text-purple-600 dark:hover:text-purple-300'
           }`}
-          title="Toggle Discrete Trace Console"
+          title="Event Console"
         >
-          <Terminal className="w-4 h-4" />
+          <Terminal className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
