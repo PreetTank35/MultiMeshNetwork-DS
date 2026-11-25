@@ -323,9 +323,9 @@ export function App() {
               />
             )}
 
-            {/* Unified Non-Overlapping Left HUD Column */}
+            {/* Static Independent HUD Anchors (never shift when nodes or links increase) */}
             {!isPresentationMode && (
-              <div className="absolute top-3 left-3 z-30 flex flex-col gap-2.5 items-start pointer-events-none max-w-[calc(100vw-280px)]">
+              <>
                 <NetworkBuilderToolbar
                   activeTool={activeTool}
                   onChangeTool={tool => {
@@ -358,7 +358,7 @@ export function App() {
                   onHighlightRoute={setHighlightedRoute}
                   onTransmitPacket={handleInjectPacket}
                 />
-              </div>
+              </>
             )}
 
             <FloatingPlayerBar

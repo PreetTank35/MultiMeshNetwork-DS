@@ -34,10 +34,7 @@ interface DropBurst {
 }
 
 interface AckParticle {
-  sx: number;
-  sy: number;
-  dx: number;
-  dy: number;
+  waypoints: Array<{ x: number; y: number }>;
   startTime: number;
 }
 
@@ -135,60 +132,61 @@ export const TopologyCanvas: React.FC<Props> = ({
   // Fit blueprint cleanly inside the open safe area to the right of left HUD
   const handleFitView = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const leftPadding = isPresentationMode ? 40 : 330;
-    const availW = Math.max(canvas.width - leftPadding - 40, 400);
-    const availH = Math.max(canvas.height - 150, 320);
+    const parent = canvas?.parentElement;
+    if (!canvas || !parent) return;
+    const cw = parent.clientWidth;
+    const ch = parent.clientHeight;
+    const leftPadding = isPresentationMode ? 40 : 372;
+    const availW = Math.max(cw - leftPadding - 40, 400);
+    const availH = Math.max(ch - 170, 320);
     const bpW = 920;
     const bpH = 540;
-    const scale = Math.min(availW / bpW, availH / bpH, 1.05);
+    const scale = Math.min(availW / bpW, availH / bpH, 1.15);
     const offsetX = leftPadding + (availW - bpW * scale) / 2 - 60 * scale;
-    const offsetY = 60 + (availH - bpH * scale) / 2 - 70 * scale;
+    const offsetY = 66 + (availH - bpH * scale) / 2 - 70 * scale;
     setTransform({ x: Math.round(offsetX), y: Math.round(offsetY), scale: Number(scale.toFixed(2)) });
   }, [isPresentationMode]);
 
-  // Auto-fit once on initial mount after canvas measures
+  // Auto-fit once on initial mount or when toggling presentation mode
   useEffect(() => {
     const timer = setTimeout(handleFitView, 80);
     return () => clearTimeout(timer);
   }, [handleFitView]);
 
-  // Detect hop, delivery, and drop events
+  // Detect hop, delivery, and drop events (strictly deduplicated)
   useEffect(() => {
     for (const pkt of activePackets) {
       const prevHops = prevPacketHops.current.get(pkt.id) ?? 0;
 
-      if (pkt.hops > prevHops && pkt.state === 'transmitting') {
-        const hopNode = nodes.find(n => n.id === pkt.currentHop);
-        const sm = hopNode ? submeshes.find(s => s.id === hopNode.submeshId) : null;
-        if (hopNode && showWaveRings) {
-          waveEffects.current.push({
-            x: hopNode.position.x,
-            y: hopNode.position.y,
-            startTime: performance.now(),
-            maxRadius: hopNode.type === 'gateway' ? 115 : 85,
-            color: sm?.color || '#2563EB',
-          });
+      if (pkt.state === 'transmitting' && prevHops !== -1) {
+        if (pkt.hops > prevHops) {
+          const hopNode = nodes.find(n => n.id === pkt.currentHop);
+          const sm = hopNode ? submeshes.find(s => s.id === hopNode.submeshId) : null;
+          if (hopNode && showWaveRings) {
+            waveEffects.current.push({
+              x: hopNode.position.x,
+              y: hopNode.position.y,
+              startTime: performance.now(),
+              maxRadius: hopNode.type === 'gateway' ? 115 : 85,
+              color: sm?.color || '#2563EB',
+            });
+          }
+          prevPacketHops.current.set(pkt.id, pkt.hops);
         }
-      }
-      prevPacketHops.current.set(pkt.id, pkt.hops);
+      } else if (pkt.state === 'received' && prevHops !== -1) {
+        const revWaypoints = [...pkt.pathTraversed]
+          .reverse()
+          .map(nid => nodes.find(n => n.id === nid)?.position)
+          .filter((p): p is { x: number; y: number } => Boolean(p));
 
-      if (pkt.state === 'received' && prevHops !== -1) {
-        const srcN = nodes.find(n => n.id === pkt.src);
-        const dstN = nodes.find(n => n.id === pkt.dst);
-        if (srcN && dstN) {
+        if (revWaypoints.length >= 2) {
           ackParticles.current.push({
-            sx: dstN.position.x,
-            sy: dstN.position.y,
-            dx: srcN.position.x,
-            dy: srcN.position.y,
+            waypoints: revWaypoints,
             startTime: performance.now(),
           });
         }
         prevPacketHops.current.set(pkt.id, -1);
-      }
-
-      if (pkt.state === 'dropped' && prevHops >= 0) {
+      } else if (pkt.state === 'dropped' && prevHops !== -1) {
         const dropNode = nodes.find(n => n.id === pkt.currentHop);
         if (dropNode) {
           const sparks = Array.from({ length: 10 }, () => {
@@ -245,10 +243,16 @@ export const TopologyCanvas: React.FC<Props> = ({
 
     const render = () => {
       const parent = canvas.parentElement;
-      if (parent && (canvas.width !== parent.clientWidth || canvas.height !== parent.clientHeight)) {
-        canvas.width = parent.clientWidth;
-        canvas.height = parent.clientHeight;
+      const cw = parent ? parent.clientWidth : canvas.clientWidth;
+      const ch = parent ? parent.clientHeight : canvas.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(ch * dpr)) {
+        canvas.width = Math.round(cw * dpr);
+        canvas.height = Math.round(ch * dpr);
       }
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const now = performance.now();
       const activeLinkSet = getActiveLinks();
@@ -257,7 +261,7 @@ export const TopologyCanvas: React.FC<Props> = ({
 
       // 1. Soft Neomorphic Canvas Drafting Surface
       ctx.fillStyle = isDarkTheme ? '#1F2534' : '#E0E6F0';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, cw, ch);
 
       ctx.save();
       ctx.translate(transform.x, transform.y);
@@ -268,8 +272,8 @@ export const TopologyCanvas: React.FC<Props> = ({
         const dotStep = 40;
         const sx = -transform.x / transform.scale - 80;
         const sy = -transform.y / transform.scale - 80;
-        const ex = sx + canvas.width / transform.scale + 160;
-        const ey = sy + canvas.height / transform.scale + 160;
+        const ex = sx + cw / transform.scale + 160;
+        const ey = sy + ch / transform.scale + 160;
         ctx.fillStyle = isDarkTheme ? 'rgba(148, 163, 184, 0.14)' : 'rgba(100, 116, 139, 0.22)';
         for (let gx = Math.floor(sx / dotStep) * dotStep; gx <= ex; gx += dotStep) {
           for (let gy = Math.floor(sy / dotStep) * dotStep; gy <= ey; gy += dotStep) {
@@ -450,30 +454,35 @@ export const TopologyCanvas: React.FC<Props> = ({
         ctx.restore();
       }
 
-      // 8. ACK Return Pulses
+      // 8. Smooth Reverse-Hop ACK Return Pulses (Single pulse per delivery)
       ackParticles.current = ackParticles.current.filter(a => now - a.startTime < 1400);
       for (const a of ackParticles.current) {
-        const t = Math.min((now - a.startTime) / 1400, 1);
-        const easeT = 1 - Math.pow(1 - t, 2);
-        const ax = a.sx + (a.dx - a.sx) * easeT;
-        const ay = a.sy + (a.dy - a.sy) * easeT;
+        const wps = a.waypoints;
+        if (wps.length < 2) continue;
+        const t = Math.min((now - a.startTime) / 1400, 0.999);
+        const segCount = wps.length - 1;
+        const scaled = t * segCount;
+        const segIdx = Math.min(Math.floor(scaled), segCount - 1);
+        const localT = scaled - segIdx;
+        const p1 = wps[segIdx];
+        const p2 = wps[segIdx + 1];
+        const ax = p1.x + (p2.x - p1.x) * localT;
+        const ay = p1.y + (p2.y - p1.y) * localT;
 
         ctx.save();
-        const g = ctx.createRadialGradient(ax, ay, 0, ax, ay, 9);
+        const g = ctx.createRadialGradient(ax, ay, 0, ax, ay, 10);
         g.addColorStop(0, '#FFFFFF');
         g.addColorStop(0.35, '#059669');
         g.addColorStop(1, 'transparent');
         ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.arc(ax, ay, 9, 0, Math.PI * 2);
+        ctx.arc(ax, ay, 10, 0, Math.PI * 2);
         ctx.fill();
 
-        if (t < 0.45) {
-          ctx.fillStyle = '#059669';
-          ctx.font = '700 8.5px "JetBrains Mono", monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText('ACK ✓', ax, ay - 11);
-        }
+        ctx.fillStyle = '#059669';
+        ctx.font = '700 9px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('ACK ✓', ax, ay - 12);
         ctx.restore();
       }
 
@@ -753,45 +762,45 @@ export const TopologyCanvas: React.FC<Props> = ({
         className="w-full h-full cursor-crosshair block"
       />
 
-      {/* Top-Right Blueprint Controls Pill */}
-      <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-2">
-        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl neu-convex">
+      {/* Top-Right Static Blueprint Controls Pill — Larger & Crisp */}
+      <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2.5">
+        <div className="flex items-center gap-2 p-2 rounded-2xl neu-convex">
           <button
             onClick={() => setIsToolbarOpen(!isToolbarOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-semibold transition-all ${
               isToolbarOpen ? 'neu-pressed text-sky-600 dark:text-cyan-400' : 'neu-button-sm text-neu-text'
             }`}
             title="Floor Plan & Visual Layer Settings"
           >
-            <Sliders className="w-3.5 h-3.5 text-sky-600 dark:text-cyan-400" />
+            <Sliders className="w-4 h-4 text-sky-600 dark:text-cyan-400" />
             <span>Blueprint</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-md neu-pressed-sm text-sky-600 dark:text-cyan-400 font-mono font-bold">
+            <span className="text-[11px] px-2 py-0.5 rounded-md neu-pressed-sm text-sky-600 dark:text-cyan-400 font-mono font-bold">
               {Math.round(blueprintOpacity * 100)}%
             </span>
           </button>
 
           <button
             onClick={handleFitView}
-            className="p-1.5 rounded-xl neu-button-sm text-neu-muted hover:text-neu-text"
+            className="p-2 rounded-xl neu-button-sm text-neu-muted hover:text-neu-text"
             title="Fit Campus to View"
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            <Maximize2 className="w-4 h-4" />
           </button>
         </div>
 
         {isToolbarOpen && (
-          <div className="w-72 p-4 rounded-2xl neu-convex flex flex-col gap-3 text-xs text-neu-text animate-fade-up">
-            <div className="flex items-center justify-between pb-2 border-b border-neu-border">
-              <div className="flex items-center gap-1.5 font-bold">
+          <div className="w-80 p-4 rounded-2xl neu-convex flex flex-col gap-3.5 text-xs text-neu-text animate-fade-up">
+            <div className="flex items-center justify-between pb-2.5 border-b border-neu-border">
+              <div className="flex items-center gap-2 font-bold text-[13px]">
                 <Layers className="w-4 h-4 text-sky-600 dark:text-cyan-400" />
                 <span>2D Floor Plan Sketch</span>
               </div>
-              <span className="text-[10px] text-neu-muted font-mono">CAD</span>
+              <span className="text-[11px] text-neu-muted font-mono font-bold">CAD</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-neu-muted">Map Preset</label>
-              <div className="grid grid-cols-3 gap-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-neu-muted">Map Preset</label>
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { key: 'campus_academic_wing', label: 'Campus' },
                   { key: 'smart_logistics', label: 'Logistics' },
@@ -800,7 +809,7 @@ export const TopologyCanvas: React.FC<Props> = ({
                   <button
                     key={opt.key}
                     onClick={() => setSelectedBlueprintKey(opt.key)}
-                    className={`px-2 py-1.5 rounded-xl text-[11px] font-semibold transition-all ${
+                    className={`px-2.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                       selectedBlueprintKey === opt.key
                         ? 'neu-pressed text-sky-600 dark:text-cyan-300'
                         : 'neu-button-sm text-neu-muted hover:text-neu-text'
@@ -813,8 +822,8 @@ export const TopologyCanvas: React.FC<Props> = ({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-neu-muted font-medium">Sketch Opacity</span>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-neu-muted font-semibold">Sketch Opacity</span>
                 <span className="text-sky-600 dark:text-cyan-400 font-mono font-bold">
                   {Math.round(blueprintOpacity * 100)}%
                 </span>
@@ -831,23 +840,23 @@ export const TopologyCanvas: React.FC<Props> = ({
             </div>
 
             <div className="flex flex-col gap-2 pt-2 border-t border-neu-border">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-neu-muted">Overlays</span>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} className="accent-sky-600" />
+              <span className="text-[11px] uppercase font-bold tracking-wider text-neu-muted">Overlays</span>
+              <div className="grid grid-cols-2 gap-2.5 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} className="accent-sky-600 w-3.5 h-3.5" />
                   <span>Dot Grid</span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={showHulls} onChange={e => setShowHulls(e.target.checked)} className="accent-sky-600" />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showHulls} onChange={e => setShowHulls(e.target.checked)} className="accent-sky-600 w-3.5 h-3.5" />
                   <span>Sub-Mesh Hulls</span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={showWaveRings} onChange={e => setShowWaveRings(e.target.checked)} className="accent-sky-600" />
-                  <span className="flex items-center gap-1"><Radio className="w-3 h-3 text-sky-500" />RF Waves</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showWaveRings} onChange={e => setShowWaveRings(e.target.checked)} className="accent-sky-600 w-3.5 h-3.5" />
+                  <span className="flex items-center gap-1"><Radio className="w-3.5 h-3.5 text-sky-500" />RF Waves</span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={showConduitGlow} onChange={e => setShowConduitGlow(e.target.checked)} className="accent-sky-600" />
-                  <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" />Beam Glow</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={showConduitGlow} onChange={e => setShowConduitGlow(e.target.checked)} className="accent-sky-600 w-3.5 h-3.5" />
+                  <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 text-amber-500" />Beam Glow</span>
                 </label>
               </div>
             </div>
@@ -855,18 +864,18 @@ export const TopologyCanvas: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Bottom-Left Compact Status Pill */}
-      <div className="absolute bottom-4 left-3 z-10 flex items-center gap-2.5 px-3 py-1.5 rounded-xl neu-convex-sm text-[11px] text-neu-muted font-mono pointer-events-none">
+      {/* Bottom-Left Static Status Pill — Larger & Readable */}
+      <div className="absolute bottom-5 left-4 z-10 flex items-center gap-3 px-4 py-2 rounded-2xl neu-convex-sm text-xs text-neu-muted font-mono pointer-events-none">
         <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
           60 FPS
         </span>
         <span>•</span>
-        <span>{Math.round(transform.scale * 100)}%</span>
+        <span className="font-semibold text-neu-text">{Math.round(transform.scale * 100)}%</span>
         <span>•</span>
-        <span>{nodes.length} Nodes</span>
+        <span><strong className="text-neu-text">{nodes.length}</strong> Nodes</span>
         <span>•</span>
-        <span>{links.length} Links</span>
+        <span><strong className="text-neu-text">{links.length}</strong> Links</span>
       </div>
     </div>
   );
