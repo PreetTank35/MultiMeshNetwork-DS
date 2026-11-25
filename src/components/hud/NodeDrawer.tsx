@@ -28,7 +28,7 @@ export const NodeDrawer: React.FC<Props> = ({
   const getSubmesh = (id: string) => submeshes.find(s => s.id === id);
 
   return (
-    <div className="absolute top-0 right-0 h-full w-80 z-40 animate-slide-in-right flex flex-col pointer-events-auto select-none p-2">
+    <div className="absolute top-0 right-0 h-full w-96 max-w-[92vw] z-40 animate-slide-in-right flex flex-col pointer-events-auto select-none p-2.5">
       <div className="flex-1 neu-convex rounded-3xl overflow-hidden flex flex-col">
         {/* Drawer Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neu-border">

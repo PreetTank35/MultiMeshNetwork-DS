@@ -1,6 +1,6 @@
 /**
- * PathPickerHUD — Multi-Mesh Auto-Pathfinding & Route Inspector HUD
- * Tactile neomorphic panel docked cleanly inside the top-left flex column below NetworkBuilderToolbar.
+ * PathPickerHUD — Static Fixed-Width Multi-Mesh Pathfinding Card
+ * Anchored statically at top-[80px] left-4; never shifts or changes size with canvas zoom or mesh growth.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -107,55 +107,53 @@ export const PathPickerHUD: React.FC<Props> = ({
 
   return (
     <div
-      className={`pointer-events-auto transition-all duration-200 font-sans select-none ${
-        isMinimized ? 'w-fit' : 'w-[300px]'
+      className={`absolute top-[78px] left-4 z-20 pointer-events-auto transition-all duration-200 font-sans select-none ${
+        isMinimized ? 'w-60' : 'w-[340px]'
       } ${className}`}
     >
       <div className="rounded-2xl neu-convex overflow-hidden">
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-neu-border">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded-xl neu-pressed-sm flex items-center justify-center text-sky-600 dark:text-cyan-400">
-              <Route className="w-3.5 h-3.5" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-neu-border">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl neu-pressed-sm flex items-center justify-center text-sky-600 dark:text-cyan-400">
+              <Route className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-xs font-bold text-neu-text flex items-center space-x-1.5">
+              <div className="text-[13px] font-bold text-neu-text flex items-center space-x-2">
                 <span>Path Finder</span>
-                <span className="px-1.5 py-0.2 rounded-md text-[9px] font-mono neu-pressed-sm text-sky-600 dark:text-cyan-400 font-bold">
+                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono neu-pressed-sm text-sky-600 dark:text-cyan-400 font-bold">
                   MRMC
                 </span>
               </div>
               {!isMinimized && (
-                <div className="text-[9.5px] text-neu-muted font-mono">
+                <div className="text-[11px] text-neu-muted font-mono">
                   Point-to-Point Auto-Routing
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center space-x-1 ml-2">
-            <button
-              onClick={() => setIsMinimized(!isMinimized)}
-              className="p-1.5 rounded-lg neu-button-sm text-neu-muted hover:text-neu-text"
-              title={isMinimized ? 'Expand Path Finder' : 'Minimize Path Finder'}
-            >
-              {isMinimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
-            </button>
-          </div>
+          <button
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="p-1.5 rounded-xl neu-button-sm text-neu-muted hover:text-neu-text"
+            title={isMinimized ? 'Expand Path Finder' : 'Minimize Path Finder'}
+          >
+            {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Content Body */}
+        {/* Content Body — Static fixed scroll ceiling */}
         {!isMinimized && (
-          <div className="p-3.5 space-y-3 max-h-[calc(100vh-275px)] overflow-y-auto custom-scrollbar">
+          <div className="p-4 space-y-3.5 max-h-[calc(100vh-240px)] overflow-y-auto custom-scrollbar">
             {/* Source Selector */}
             <div>
-              <div className="flex items-center justify-between text-[10px] text-neu-muted uppercase tracking-wider mb-1 font-semibold">
-                <span className="flex items-center space-x-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                  <span>Source</span>
+              <div className="flex items-center justify-between text-[11px] text-neu-muted uppercase tracking-wider mb-1.5 font-bold">
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                  <span>Source Node</span>
                 </span>
                 {sourceSm && (
-                  <span className="font-mono text-[9px] font-bold" style={{ color: sourceSm.color }}>
+                  <span className="font-mono text-[10px] font-bold" style={{ color: sourceSm.color }}>
                     {sourceSm.protocol}
                   </span>
                 )}
@@ -163,7 +161,7 @@ export const PathPickerHUD: React.FC<Props> = ({
               <select
                 value={sourceId}
                 onChange={e => { setSourceId(e.target.value); setRouteResult(null); }}
-                className="w-full neu-select rounded-xl px-2.5 py-1.5 text-[11px] font-mono focus:outline-none"
+                className="w-full neu-select rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
               >
                 <option value="">Select source node...</option>
                 {aliveNodes.map(n => {
@@ -182,21 +180,21 @@ export const PathPickerHUD: React.FC<Props> = ({
               <button
                 onClick={handleSwap}
                 title="Swap Source and Destination"
-                className="p-1.5 rounded-full neu-button-sm text-neu-muted hover:text-neu-text"
+                className="p-2 rounded-full neu-button-sm text-neu-muted hover:text-neu-text"
               >
-                <ArrowRightLeft className="w-3 h-3" />
+                <ArrowRightLeft className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Destination Selector */}
             <div>
-              <div className="flex items-center justify-between text-[10px] text-neu-muted uppercase tracking-wider mb-1 font-semibold">
-                <span className="flex items-center space-x-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-                  <span>Destination</span>
+              <div className="flex items-center justify-between text-[11px] text-neu-muted uppercase tracking-wider mb-1.5 font-bold">
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                  <span>Destination Node</span>
                 </span>
                 {destSm && (
-                  <span className="font-mono text-[9px] font-bold" style={{ color: destSm.color }}>
+                  <span className="font-mono text-[10px] font-bold" style={{ color: destSm.color }}>
                     {destSm.protocol}
                   </span>
                 )}
@@ -204,7 +202,7 @@ export const PathPickerHUD: React.FC<Props> = ({
               <select
                 value={destId}
                 onChange={e => { setDestId(e.target.value); setRouteResult(null); }}
-                className="w-full neu-select rounded-xl px-2.5 py-1.5 text-[11px] font-mono focus:outline-none"
+                className="w-full neu-select rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
               >
                 <option value="">Select destination node...</option>
                 {aliveNodes
@@ -224,38 +222,38 @@ export const PathPickerHUD: React.FC<Props> = ({
             <button
               disabled={!sourceId || !destId || sourceId === destId}
               onClick={handleCalculateRoute}
-              className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all flex items-center justify-center space-x-1.5 shadow-md disabled:opacity-40"
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[13px] transition-all flex items-center justify-center space-x-2 shadow-md disabled:opacity-40"
             >
-              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <Zap className="w-4 h-4 text-amber-300" />
               <span>Compute Best Route</span>
             </button>
 
             {routeResult && !routeResult.found && (
-              <div className="p-2.5 rounded-xl neu-pressed text-red-600 dark:text-red-400 text-[11px] flex items-start space-x-2">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <div className="p-3 rounded-xl neu-pressed text-red-600 dark:text-red-400 text-xs flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{routeResult.error || 'No viable path between nodes.'}</span>
               </div>
             )}
 
             {routeResult && routeResult.found && (
-              <div className="space-y-2.5 pt-1">
+              <div className="space-y-3 pt-1">
                 {/* Route Chain */}
-                <div className="p-2.5 rounded-xl neu-pressed space-y-1.5">
-                  <div className="flex items-center justify-between text-[9.5px] text-neu-muted">
-                    <span className="font-semibold uppercase">Path</span>
+                <div className="p-3 rounded-xl neu-pressed space-y-2">
+                  <div className="flex items-center justify-between text-[10.5px] text-neu-muted">
+                    <span className="font-bold uppercase">Computed Path</span>
                     <span className="font-mono font-bold text-sky-600 dark:text-cyan-400">
                       {routeResult.isCrossDomain ? '⚡ Cross-Domain' : '✓ Intra-Domain'}
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-1 overflow-x-auto custom-scrollbar pb-1 text-[10px] font-mono">
+                  <div className="flex items-center space-x-1.5 overflow-x-auto custom-scrollbar pb-1 text-[11px] font-mono">
                     {routeResult.nodesTraversed.map((n, idx) => {
                       const isGw = n.type === 'gateway';
                       return (
                         <React.Fragment key={n.id}>
-                          {idx > 0 && <ArrowRight className="w-2.5 h-2.5 text-neu-muted shrink-0" />}
+                          {idx > 0 && <ArrowRight className="w-3 h-3 text-neu-muted shrink-0" />}
                           <span
-                            className={`px-1.5 py-0.5 rounded-md shrink-0 neu-flat-sm ${
+                            className={`px-2 py-0.5 rounded-lg shrink-0 neu-flat-sm ${
                               isGw ? 'text-amber-600 dark:text-amber-300 font-bold' : 'text-neu-text'
                             }`}
                           >
@@ -267,34 +265,34 @@ export const PathPickerHUD: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* Compact 2x2 Metrics */}
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <div className="p-2 rounded-xl neu-pressed flex items-center space-x-2">
-                    <Route className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                {/* 2x2 Metrics */}
+                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                  <div className="p-2.5 rounded-xl neu-pressed flex items-center space-x-2.5">
+                    <Route className="w-4 h-4 text-blue-500 shrink-0" />
                     <div>
-                      <div className="text-neu-muted text-[9px]">Hops</div>
-                      <div className="font-bold font-mono text-neu-text">{routeResult.hops}</div>
+                      <div className="text-neu-muted text-[10px]">Total Hops</div>
+                      <div className="font-bold font-mono text-neu-text text-sm">{routeResult.hops}</div>
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl neu-pressed flex items-center space-x-2">
-                    <Layers className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <div className="p-2.5 rounded-xl neu-pressed flex items-center space-x-2.5">
+                    <Layers className="w-4 h-4 text-emerald-500 shrink-0" />
                     <div>
-                      <div className="text-neu-muted text-[9px]">Domains</div>
-                      <div className="font-bold font-mono text-neu-text">{routeResult.submeshesTraversed.length}</div>
+                      <div className="text-neu-muted text-[10px]">Domains</div>
+                      <div className="font-bold font-mono text-neu-text text-sm">{routeResult.submeshesTraversed.length}</div>
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl neu-pressed flex items-center space-x-2">
-                    <Clock className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                  <div className="p-2.5 rounded-xl neu-pressed flex items-center space-x-2.5">
+                    <Clock className="w-4 h-4 text-purple-500 shrink-0" />
                     <div>
-                      <div className="text-neu-muted text-[9px]">Latency</div>
-                      <div className="font-bold font-mono text-neu-text">{routeResult.estimatedLatencyMs} ms</div>
+                      <div className="text-neu-muted text-[10px]">Est. Latency</div>
+                      <div className="font-bold font-mono text-neu-text text-sm">{routeResult.estimatedLatencyMs} ms</div>
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl neu-pressed flex items-center space-x-2">
-                    <Radio className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <div className="p-2.5 rounded-xl neu-pressed flex items-center space-x-2.5">
+                    <Radio className="w-4 h-4 text-amber-500 shrink-0" />
                     <div>
-                      <div className="text-neu-muted text-[9px]">Min SNR</div>
-                      <div className="font-bold font-mono text-neu-text">{routeResult.bottleneckSnrDb} dB</div>
+                      <div className="text-neu-muted text-[10px]">Min SNR</div>
+                      <div className="font-bold font-mono text-neu-text text-sm">{routeResult.bottleneckSnrDb} dB</div>
                     </div>
                   </div>
                 </div>
@@ -302,23 +300,23 @@ export const PathPickerHUD: React.FC<Props> = ({
                 {/* Expandable Segment Details */}
                 <button
                   onClick={() => setShowSegmentDetails(!showSegmentDetails)}
-                  className="w-full flex items-center justify-between text-[10px] text-neu-muted hover:text-neu-text py-0.5"
+                  className="w-full flex items-center justify-between text-[11px] text-neu-muted hover:text-neu-text font-medium py-1"
                 >
                   <span>Hop Breakdown (C = {routeResult.metricCost})</span>
-                  {showSegmentDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  {showSegmentDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
                 {showSegmentDetails && (
-                  <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
                     {routeResult.segmentTraces.map((seg, i) => (
-                      <div key={i} className="p-2 rounded-lg neu-pressed text-[9.5px] font-mono">
+                      <div key={i} className="p-2.5 rounded-xl neu-pressed text-[10.5px] font-mono">
                         <div className="flex justify-between text-neu-text font-semibold">
                           <span className="truncate">{seg.fromNodeName.split(' ')[0]} → {seg.toNodeName.split(' ')[0]}</span>
                           <span className={seg.type === 'gateway_transition' ? 'text-amber-500' : 'text-sky-500'}>
                             {seg.type === 'gateway_transition' ? 'GATEWAY' : seg.protocol}
                           </span>
                         </div>
-                        <div className="text-neu-muted flex justify-between mt-0.5">
+                        <div className="text-neu-muted flex justify-between mt-1">
                           <span>{seg.bandwidthMbps}Mbps</span>
                           <span>{seg.snrDb}dB</span>
                           <span>{seg.hopDelayMs}ms</span>
@@ -329,11 +327,11 @@ export const PathPickerHUD: React.FC<Props> = ({
                 )}
 
                 {/* Transmit Controls */}
-                <div className="pt-2 border-t border-neu-border space-y-2">
+                <div className="pt-2.5 border-t border-neu-border space-y-2.5">
                   <select
                     value={payloadType}
                     onChange={e => setPayloadType(e.target.value)}
-                    className="w-full neu-select rounded-xl px-2.5 py-1.5 text-[11px] font-mono focus:outline-none"
+                    className="w-full neu-select rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
                   >
                     <option>IoT Sensor Telemetry (512 B)</option>
                     <option>Video Stream Keyframe (4 KB)</option>
@@ -343,15 +341,15 @@ export const PathPickerHUD: React.FC<Props> = ({
 
                   <button
                     onClick={handleTransmit}
-                    className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all flex items-center justify-center space-x-1.5 shadow-md"
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[13px] transition-all flex items-center justify-center space-x-2 shadow-md"
                   >
-                    <Send className="w-3.5 h-3.5" />
+                    <Send className="w-4 h-4" />
                     <span>Transmit Packet</span>
                   </button>
 
                   {transmissionFeedback && (
-                    <div className="p-1.5 rounded-lg neu-pressed text-emerald-600 dark:text-emerald-400 text-[10px] font-mono flex items-center justify-center space-x-1 animate-fade-up">
-                      <CheckCircle2 className="w-3 h-3" />
+                    <div className="p-2 rounded-xl neu-pressed text-emerald-600 dark:text-emerald-400 text-[11px] font-mono flex items-center justify-center space-x-1.5 animate-fade-up">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>{transmissionFeedback}</span>
                     </div>
                   )}
