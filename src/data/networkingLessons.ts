@@ -32,7 +32,7 @@ export const NETWORKING_LESSONS: NetworkingLesson[] = [
     ],
     experimentGoal: 'Observe how packets hop between non-adjacent nodes through intermediate relays without any central controller.',
     recommendedTopology: 'smart_campus',
-    interactiveStepAction: 'Inject a packet from IT Lab Router A to Data Comm Lab Router B and observe the intermediate hop.'
+    interactiveStepAction: 'Inject a packet from Embedded & IoT Lab (LAB-203) to Data Comm Lab Router (LAB-202) and observe the intermediate hop.'
   },
   {
     id: 'lesson_2_gupta_kumar',
@@ -64,7 +64,7 @@ export const NETWORKING_LESSONS: NetworkingLesson[] = [
     keyFormula: 'λ_multi(N) = O( √(M / N) )',
     experimentGoal: 'Witness packet traversal from an IoT Sensor (2.4 GHz RPL) traversing the boundary gateway to an Enterprise Wi-Fi Server (5.2 GHz HWMP).',
     recommendedTopology: 'smart_campus',
-    interactiveStepAction: 'Inject packet from Campus AQI Sensor to Campus Main Server and open Gateway Inspector.'
+    interactiveStepAction: 'Inject packet from Campus AQI / Weather Mast to Campus Main Server (NOC-201) and open Gateway Inspector.'
   },
   {
     id: 'lesson_4_protocols',
@@ -96,7 +96,7 @@ export const NETWORKING_LESSONS: NetworkingLesson[] = [
     keyFormula: 'PER = 1 - (1 - BER(SNR))^L',
     experimentGoal: 'Drag nodes farther apart on the canvas and observe the real-time SNR drop, PER increase, and eventual link severance.',
     recommendedTopology: 'smart_campus',
-    interactiveStepAction: 'Drag IT Lab Router A to the far edge of the screen and inspect its link loss rate.'
+    interactiveStepAction: 'Drag Embedded & IoT Lab (LAB-203) to the far edge of the screen and inspect its link loss rate.'
   },
   {
     id: 'lesson_6_self_healing',
@@ -108,12 +108,12 @@ export const NETWORKING_LESSONS: NetworkingLesson[] = [
       'When an active link is severed or an intermediate router runs out of battery, a well-engineered mesh must detect missing ACK frames and recalculate an alternate route autonomously.',
       'In our simulator, the Fault Studio allows examiners and students to trigger instant outages:',
       '1. "Kill Node": Shuts down an active router; adjacent nodes detect failure and route around it.',
-      '2. "Cut Gateway Link": Disables primary boundary link; traffic dynamically switches to secondary backup gateway.',
+      '2. "Cut Gateway Link": Disables primary boundary link; traffic dynamically switches to secondary South Border Gateway B.',
       '3. "Jam Channel": Slices SNR across an entire RF band to simulate intentional radio interference.'
     ],
-    experimentGoal: 'Sever the primary gateway link during packet flow and observe real-time rerouting to Backup Gateway B.',
+    experimentGoal: 'Sever the North Border Gateway A link during packet flow and observe real-time rerouting to South Border Gateway B.',
     recommendedTopology: 'smart_campus',
-    interactiveStepAction: 'Click "Sever Primary Link" in Fault Studio while tracing packets to observe automatic failover.'
+    interactiveStepAction: 'Click "Sever Link (Cut Wire)" on the North Border Gateway A bridge link in Fault Studio while tracing packets to observe automatic failover.'
   }
 ];
 

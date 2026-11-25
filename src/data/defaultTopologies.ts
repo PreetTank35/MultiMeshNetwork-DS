@@ -16,22 +16,26 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       id: 'mesh_wifi',
       name: 'Campus Enterprise Wi-Fi 6',
       protocol: 'HWMP',
+      technology: 'Wi-Fi 6',
+      defaultBandwidthMbps: 150,
       frequencyBand: '5.2GHz',
       channelWidthMhz: 40,
       channelNumber: 36,
-      color: '#3B82F6', // Electric Cobalt Blue
-      description: 'High-speed 802.11s backhaul connecting NOC server, faculty labs, and academic classrooms'
+      color: '#3B82F6',
+      description: 'High-speed 802.11s backhaul connecting NOC server, faculty labs, and academic classrooms',
     },
     {
       id: 'mesh_iot',
       name: 'Environmental IoT Thread/RPL',
       protocol: 'RPL',
+      technology: 'Thread',
+      defaultBandwidthMbps: 0.25,
       frequencyBand: '2.4GHz',
       channelWidthMhz: 20,
       channelNumber: 15,
-      color: '#10B981', // Emerald Green
-      description: 'Ultra-low-power 802.15.4 sensor mesh covering the outdoor Quad and Environmental Monitoring Station'
-    }
+      color: '#10B981',
+      description: 'Ultra-low-power 802.15.4 sensor mesh covering the outdoor Quad and Environmental Monitoring Station',
+    },
   ];
 
   const nodes: MeshNode[] = [
@@ -44,13 +48,27 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 170, y: 180 },
       mobilityModel: 'static',
       txPowerDbm: 24,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 128,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_wf_srv', type: 'wifi', mac: '00:1A:2B:AA:01:01', channel: 36, frequencyBand: '5.2GHz', txPowerDbm: 24, bandwidthMbps: 150 }
+        {
+          id: 'if_wf_srv',
+          type: 'wifi',
+          mac: '00:1A:2B:AA:01:01',
+          channel: 36,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 24,
+          bandwidthMbps: 150,
+          submeshId: 'mesh_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 2: DATA COMMUNICATION LAB (Bottom-Left) ---
@@ -62,13 +80,27 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 170, y: 450 },
       mobilityModel: 'static',
       txPowerDbm: 20,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 64,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_wf_labb', type: 'wifi', mac: '00:1A:2B:AA:03:01', channel: 36, frequencyBand: '5.2GHz', txPowerDbm: 20, bandwidthMbps: 100 }
+        {
+          id: 'if_wf_labb',
+          type: 'wifi',
+          mac: '00:1A:2B:AA:03:01',
+          channel: 36,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 20,
+          bandwidthMbps: 100,
+          submeshId: 'mesh_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 3: EMBEDDED & IoT LAB (Top-Center) ---
@@ -80,13 +112,27 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 440, y: 180 },
       mobilityModel: 'static',
       txPowerDbm: 20,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 64,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_wf_laba', type: 'wifi', mac: '00:1A:2B:AA:02:01', channel: 36, frequencyBand: '5.2GHz', txPowerDbm: 20, bandwidthMbps: 100 }
+        {
+          id: 'if_wf_laba',
+          type: 'wifi',
+          mac: '00:1A:2B:AA:02:01',
+          channel: 36,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 20,
+          bandwidthMbps: 100,
+          submeshId: 'mesh_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 4: ACADEMIC CLASSROOMS & FACULTY (Bottom-Center) ---
@@ -98,13 +144,27 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 440, y: 450 },
       mobilityModel: 'static',
       txPowerDbm: 20,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 64,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_wf_adm', type: 'wifi', mac: '00:1A:2B:AA:04:01', channel: 36, frequencyBand: '5.2GHz', txPowerDbm: 20, bandwidthMbps: 100 }
+        {
+          id: 'if_wf_adm',
+          type: 'wifi',
+          mac: '00:1A:2B:AA:04:01',
+          channel: 36,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 20,
+          bandwidthMbps: 100,
+          submeshId: 'mesh_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- BOUNDARY SPINE: MRMC DUAL-RADIO BORDER GATEWAYS ---
@@ -116,15 +176,41 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 580, y: 200 },
       mobilityModel: 'static',
       txPowerDbm: 24,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: true,
       queueCapacity: 128,
       currentQueue: [],
       isAlive: true,
-      rplRank: 1, // DODAG Root
+      rplRank: 1,
       interfaces: [
-        { id: 'if_gw1_wifi', type: 'wifi', mac: '00:1A:2B:GW:01:01', channel: 36, frequencyBand: '5.2GHz', txPowerDbm: 24, bandwidthMbps: 150 },
-        { id: 'if_gw1_zigbee', type: 'zigbee', mac: '00:1A:2B:GW:01:02', channel: 15, frequencyBand: '2.4GHz', txPowerDbm: 18, bandwidthMbps: 2.5 }
+        {
+          id: 'if_gw1_wifi',
+          type: 'wifi',
+          mac: '00:1A:2B:GW:01:01',
+          channel: 36,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 24,
+          bandwidthMbps: 150,
+          submeshId: 'mesh_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
+        {
+          id: 'if_gw1_zigbee',
+          type: 'thread',
+          mac: '00:1A:2B:GW:01:02',
+          channel: 15,
+          frequencyBand: '2.4GHz',
+          txPowerDbm: 18,
+          bandwidthMbps: 2.5,
+          submeshId: 'mesh_iot',
+          technology: 'Thread',
+          receiverSensitivityDbm: -92,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_gw_backup',
@@ -134,15 +220,41 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 580, y: 420 },
       mobilityModel: 'static',
       txPowerDbm: 24,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: true,
       queueCapacity: 128,
       currentQueue: [],
       isAlive: true,
       rplRank: 2,
       interfaces: [
-        { id: 'if_gw2_wifi', type: 'wifi', mac: '00:1A:2B:GW:02:01', channel: 36, frequencyBand: '5.2GHz', txPowerDbm: 24, bandwidthMbps: 150 },
-        { id: 'if_gw2_zigbee', type: 'zigbee', mac: '00:1A:2B:GW:02:02', channel: 15, frequencyBand: '2.4GHz', txPowerDbm: 18, bandwidthMbps: 2.5 }
+        {
+          id: 'if_gw2_wifi',
+          type: 'wifi',
+          mac: '00:1A:2B:GW:02:01',
+          channel: 36,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 24,
+          bandwidthMbps: 150,
+          submeshId: 'mesh_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
+        {
+          id: 'if_gw2_zigbee',
+          type: 'thread',
+          mac: '00:1A:2B:GW:02:02',
+          channel: 15,
+          frequencyBand: '2.4GHz',
+          txPowerDbm: 18,
+          bandwidthMbps: 2.5,
+          submeshId: 'mesh_iot',
+          technology: 'Thread',
+          receiverSensitivityDbm: -92,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 5: CENTRAL OPEN COURTYARD / QUAD (Top-Right) ---
@@ -154,14 +266,28 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 720, y: 190 },
       mobilityModel: 'static',
       txPowerDbm: 15,
+      receiverSensitivityDbm: -92,
+      isMultiRadio: false,
       queueCapacity: 32,
       currentQueue: [],
       isAlive: true,
       rplRank: 3,
       interfaces: [
-        { id: 'if_iot_rep1', type: 'zigbee', mac: '00:1A:2B:CC:01:01', channel: 15, frequencyBand: '2.4GHz', txPowerDbm: 15, bandwidthMbps: 2.5 }
+        {
+          id: 'if_iot_rep1',
+          type: 'thread',
+          mac: '00:1A:2B:CC:01:01',
+          channel: 15,
+          frequencyBand: '2.4GHz',
+          txPowerDbm: 15,
+          bandwidthMbps: 2.5,
+          submeshId: 'mesh_iot',
+          technology: 'Thread',
+          receiverSensitivityDbm: -92,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_iot_solar',
@@ -171,14 +297,28 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 860, y: 150 },
       mobilityModel: 'static',
       txPowerDbm: 10,
+      receiverSensitivityDbm: -92,
+      isMultiRadio: false,
       queueCapacity: 16,
       currentQueue: [],
       isAlive: true,
       rplRank: 4,
       interfaces: [
-        { id: 'if_iot_sol', type: 'zigbee', mac: '00:1A:2B:CC:02:01', channel: 15, frequencyBand: '2.4GHz', txPowerDbm: 10, bandwidthMbps: 0.25 }
+        {
+          id: 'if_iot_sol',
+          type: 'zigbee',
+          mac: '00:1A:2B:CC:02:01',
+          channel: 15,
+          frequencyBand: '2.4GHz',
+          txPowerDbm: 10,
+          bandwidthMbps: 0.25,
+          submeshId: 'mesh_iot',
+          technology: 'Thread',
+          receiverSensitivityDbm: -92,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 6: ENVIRONMENTAL MONITORING STATION (Bottom-Right) ---
@@ -190,14 +330,28 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 860, y: 450 },
       mobilityModel: 'static',
       txPowerDbm: 10,
+      receiverSensitivityDbm: -92,
+      isMultiRadio: false,
       queueCapacity: 16,
       currentQueue: [],
       isAlive: true,
       rplRank: 4,
       interfaces: [
-        { id: 'if_iot_aqi', type: 'zigbee', mac: '00:1A:2B:CC:03:01', channel: 15, frequencyBand: '2.4GHz', txPowerDbm: 10, bandwidthMbps: 0.25 }
+        {
+          id: 'if_iot_aqi',
+          type: 'zigbee',
+          mac: '00:1A:2B:CC:03:01',
+          channel: 15,
+          frequencyBand: '2.4GHz',
+          txPowerDbm: 10,
+          bandwidthMbps: 0.25,
+          submeshId: 'mesh_iot',
+          technology: 'Thread',
+          receiverSensitivityDbm: -92,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_iot_water',
@@ -207,14 +361,28 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       position: { x: 720, y: 470 },
       mobilityModel: 'static',
       txPowerDbm: 10,
+      receiverSensitivityDbm: -92,
+      isMultiRadio: false,
       queueCapacity: 16,
       currentQueue: [],
       isAlive: true,
       rplRank: 3,
       interfaces: [
-        { id: 'if_iot_wat', type: 'zigbee', mac: '00:1A:2B:CC:04:01', channel: 15, frequencyBand: '2.4GHz', txPowerDbm: 10, bandwidthMbps: 0.25 }
+        {
+          id: 'if_iot_wat',
+          type: 'zigbee',
+          mac: '00:1A:2B:CC:04:01',
+          channel: 15,
+          frequencyBand: '2.4GHz',
+          txPowerDbm: 10,
+          bandwidthMbps: 0.25,
+          submeshId: 'mesh_iot',
+          technology: 'Thread',
+          receiverSensitivityDbm: -92,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- MOBILE AGENT: CAMPUS INSPECTION ROVER ---
@@ -228,40 +396,54 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       mobilityModel: 'random_waypoint',
       mobilityBounds: { minX: 120, maxX: 880, minY: 150, maxY: 500 },
       txPowerDbm: 18,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 32,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_mob_wf', type: 'wifi', mac: '00:1A:2B:MB:01:01', channel: 36, frequencyBand: '5.2GHz', txPowerDbm: 18, bandwidthMbps: 54 }
+        {
+          id: 'if_mob_wf',
+          type: 'wifi',
+          mac: '00:1A:2B:MB:01:01',
+          channel: 36,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 18,
+          bandwidthMbps: 54,
+          submeshId: 'mesh_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
-    }
+      routingTable: {},
+    },
   ];
 
   const links: NetworkLink[] = [
     // Wi-Fi 6 Intra-Mesh Links
-    { id: 'l_srv_laba', source: 'node_wf_server', target: 'node_wf_lab_a', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 14, snrDb: 31, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_srv_labb', source: 'node_wf_server', target: 'node_wf_lab_b', bandwidthMbps: 100, lossRate: 0.015, distanceMeters: 14, snrDb: 28, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_laba_labb', source: 'node_wf_lab_a', target: 'node_wf_lab_b', bandwidthMbps: 100, lossRate: 0.02, distanceMeters: 20, snrDb: 25, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_laba_adm', source: 'node_wf_lab_a', target: 'node_wf_admin', bandwidthMbps: 100, lossRate: 0.015, distanceMeters: 14, snrDb: 29, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_labb_adm', source: 'node_wf_lab_b', target: 'node_wf_admin', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 14, snrDb: 30, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_laba_gw1', source: 'node_wf_lab_a', target: 'node_gw_primary', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 9, snrDb: 33, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_adm_gw2', source: 'node_wf_admin', target: 'node_gw_backup', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 9, snrDb: 33, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_gw1_gw2', source: 'node_gw_primary', target: 'node_gw_backup', bandwidthMbps: 300, lossRate: 0.005, distanceMeters: 11, snrDb: 35, per: 0.005, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
+    { id: 'l_srv_laba', source: 'node_wf_server', target: 'node_wf_lab_a', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 13.5, snrDb: 31, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
+    { id: 'l_srv_labb', source: 'node_wf_server', target: 'node_wf_lab_b', bandwidthMbps: 100, lossRate: 0.015, distanceMeters: 13.5, snrDb: 28, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
+    { id: 'l_laba_labb', source: 'node_wf_lab_a', target: 'node_wf_lab_b', bandwidthMbps: 100, lossRate: 0.02, distanceMeters: 19.1, snrDb: 25, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
+    { id: 'l_laba_adm', source: 'node_wf_lab_a', target: 'node_wf_admin', bandwidthMbps: 100, lossRate: 0.015, distanceMeters: 13.5, snrDb: 29, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
+    { id: 'l_labb_adm', source: 'node_wf_lab_b', target: 'node_wf_admin', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 13.5, snrDb: 30, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
+    { id: 'l_laba_gw1', source: 'node_wf_lab_a', target: 'node_gw_primary', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 7.1, snrDb: 33, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
+    { id: 'l_adm_gw2', source: 'node_wf_admin', target: 'node_gw_backup', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 7.2, snrDb: 33, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
+    { id: 'l_gw1_gw2', source: 'node_gw_primary', target: 'node_gw_backup', bandwidthMbps: 300, lossRate: 0.005, distanceMeters: 11.0, snrDb: 35, per: 0.005, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
 
     // MRMC Cross-Domain Gateway Bridge Links (Wi-Fi <-> 802.15.4 RPL)
-    { id: 'l_gw1_iotrep', source: 'node_gw_primary', target: 'node_iot_repeater', bandwidthMbps: 2.5, lossRate: 0.015, distanceMeters: 8, snrDb: 26, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_gw2_iotwat', source: 'node_gw_backup', target: 'node_iot_water', bandwidthMbps: 2.5, lossRate: 0.02, distanceMeters: 9, snrDb: 24, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
+    { id: 'l_gw1_iotrep', source: 'node_gw_primary', target: 'node_iot_repeater', bandwidthMbps: 2.5, lossRate: 0.015, distanceMeters: 7.0, snrDb: 26, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '2.4GHz', channel: 15 },
+    { id: 'l_gw2_iotwat', source: 'node_gw_backup', target: 'node_iot_water', bandwidthMbps: 2.5, lossRate: 0.02, distanceMeters: 7.4, snrDb: 24, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '2.4GHz', channel: 15 },
 
     // IoT RPL Sub-Mesh Links
-    { id: 'l_rep_sol', source: 'node_iot_repeater', target: 'node_iot_solar', bandwidthMbps: 0.25, lossRate: 0.025, distanceMeters: 8, snrDb: 22, per: 0.025, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_rep_aqi', source: 'node_iot_repeater', target: 'node_iot_aqi', bandwidthMbps: 0.25, lossRate: 0.03, distanceMeters: 15, snrDb: 19, per: 0.03, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_rep_wat', source: 'node_iot_repeater', target: 'node_iot_water', bandwidthMbps: 0.25, lossRate: 0.02, distanceMeters: 14, snrDb: 20, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_sol_aqi', source: 'node_iot_solar', target: 'node_iot_aqi', bandwidthMbps: 0.25, lossRate: 0.035, distanceMeters: 15, snrDb: 18, per: 0.035, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'l_wat_aqi', source: 'node_iot_water', target: 'node_iot_aqi', bandwidthMbps: 0.25, lossRate: 0.02, distanceMeters: 7, snrDb: 25, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
+    { id: 'l_rep_sol', source: 'node_iot_repeater', target: 'node_iot_solar', bandwidthMbps: 0.25, lossRate: 0.025, distanceMeters: 7.3, snrDb: 22, per: 0.025, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '2.4GHz', channel: 15 },
+    { id: 'l_rep_aqi', source: 'node_iot_repeater', target: 'node_iot_aqi', bandwidthMbps: 0.25, lossRate: 0.03, distanceMeters: 14.8, snrDb: 19, per: 0.03, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '2.4GHz', channel: 15 },
+    { id: 'l_rep_wat', source: 'node_iot_repeater', target: 'node_iot_water', bandwidthMbps: 0.25, lossRate: 0.02, distanceMeters: 14.0, snrDb: 20, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '2.4GHz', channel: 15 },
+    { id: 'l_sol_aqi', source: 'node_iot_solar', target: 'node_iot_aqi', bandwidthMbps: 0.25, lossRate: 0.035, distanceMeters: 15.0, snrDb: 18, per: 0.035, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '2.4GHz', channel: 15 },
+    { id: 'l_wat_aqi', source: 'node_iot_water', target: 'node_iot_aqi', bandwidthMbps: 0.25, lossRate: 0.02, distanceMeters: 7.1, snrDb: 25, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '2.4GHz', channel: 15 },
 
     // Dynamic Mobile Link to Lab A
-    { id: 'l_mob_laba', source: 'node_mobile_robot', target: 'node_wf_lab_a', bandwidthMbps: 54, lossRate: 0.025, distanceMeters: 8, snrDb: 27, per: 0.025, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 }
+    { id: 'l_mob_laba', source: 'node_mobile_robot', target: 'node_wf_lab_a', bandwidthMbps: 54, lossRate: 0.025, distanceMeters: 8.1, snrDb: 27, per: 0.025, isSevered: false, isJammed: false, isDynamic: true, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 36 },
   ];
 
   return {
@@ -273,17 +455,23 @@ export function getSmartCampusTopology(): TopologyExportJSON {
       shadowingStdDevDb: 3.5,
       referenceDistanceMeters: 1.0,
       noiseFloorDbm: -95,
-      carrierFreqGhz: 2.4
+      carrierFreqGhz: 2.4,
+      seed: 12345,
+      fixedStepMs: 20,
+      rxSensitivityDbm: -90,
+      enableInterference: true,
+      enableCollisions: true,
+      defaultTtl: 16,
     },
     submeshes,
     nodes,
     links,
     meta: {
-      exportedAt: new Date().toISOString(),
-      version: '1.2.0',
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      version: '2.0.0',
       scenarioTitle: 'MIT AOE Campus Heterogeneous Multi-Mesh Topology',
-      authors: ['Preet Tank', 'Tejas Waghmode', 'Vansh Thakre']
-    }
+      authors: ['Preet Tank', 'Tejas Waghmode', 'Vansh Thakre'],
+    },
   };
 }
 
@@ -297,22 +485,26 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       id: 'mesh_ind_wifi',
       name: 'Industrial Wi-Fi 6 TSN',
       protocol: 'HWMP',
+      technology: 'Wi-Fi 6',
+      defaultBandwidthMbps: 150,
       frequencyBand: '5.2GHz',
       channelWidthMhz: 40,
       channelNumber: 44,
-      color: '#06B6D4', // Electric Cyan
-      description: 'Ultra-low jitter TSN mesh for Dispatch NOC, AGV fleet guideway, and automated sorting conveyor'
+      color: '#06B6D4',
+      description: 'Ultra-low jitter TSN mesh for Dispatch NOC, AGV fleet guideway, and automated sorting conveyor',
     },
     {
       id: 'mesh_ind_sensor',
       name: 'High-Bay 915MHz Industrial RPL',
       protocol: 'RPL',
+      technology: '802.15.4',
+      defaultBandwidthMbps: 1.5,
       frequencyBand: '915MHz',
       channelWidthMhz: 20,
       channelNumber: 1,
-      color: '#F59E0B', // Amber Gold
-      description: 'Sub-GHz heavy-penetration sensor mesh penetrating steel storage racks and loading dock gates'
-    }
+      color: '#F59E0B',
+      description: 'Sub-GHz heavy-penetration sensor mesh penetrating steel storage racks and loading dock gates',
+    },
   ];
 
   const nodes: MeshNode[] = [
@@ -325,13 +517,27 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 180, y: 180 },
       mobilityModel: 'static',
       txPowerDbm: 24,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 128,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_log_disp', type: 'wifi', mac: '00:1A:2B:CC:01:01', channel: 44, frequencyBand: '5.2GHz', txPowerDbm: 24, bandwidthMbps: 150 }
+        {
+          id: 'if_log_disp',
+          type: 'wifi',
+          mac: '00:1A:2B:CC:01:01',
+          channel: 44,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 24,
+          bandwidthMbps: 150,
+          submeshId: 'mesh_ind_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 3: AGV TRANSIT CORRIDOR ---
@@ -343,13 +549,27 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 420, y: 370 },
       mobilityModel: 'static',
       txPowerDbm: 22,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 64,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_log_agvhub', type: 'wifi', mac: '00:1A:2B:CC:02:01', channel: 44, frequencyBand: '5.2GHz', txPowerDbm: 22, bandwidthMbps: 100 }
+        {
+          id: 'if_log_agvhub',
+          type: 'wifi',
+          mac: '00:1A:2B:CC:02:01',
+          channel: 44,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 22,
+          bandwidthMbps: 100,
+          submeshId: 'mesh_ind_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_log_agv_mobile',
@@ -361,13 +581,27 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       mobilityModel: 'linear',
       mobilityBounds: { minX: 120, maxX: 640, minY: 370, maxY: 370 },
       txPowerDbm: 18,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 32,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_log_agv_mob', type: 'wifi', mac: '00:1A:2B:CC:03:01', channel: 44, frequencyBand: '5.2GHz', txPowerDbm: 18, bandwidthMbps: 54 }
+        {
+          id: 'if_log_agv_mob',
+          type: 'wifi',
+          mac: '00:1A:2B:CC:03:01',
+          channel: 44,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 18,
+          bandwidthMbps: 54,
+          submeshId: 'mesh_ind_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 4: AUTOMATED SORTING BAY ---
@@ -379,13 +613,27 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 280, y: 510 },
       mobilityModel: 'static',
       txPowerDbm: 20,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: false,
       queueCapacity: 64,
       currentQueue: [],
       isAlive: true,
       interfaces: [
-        { id: 'if_log_sort', type: 'wifi', mac: '00:1A:2B:CC:04:01', channel: 44, frequencyBand: '5.2GHz', txPowerDbm: 20, bandwidthMbps: 100 }
+        {
+          id: 'if_log_sort',
+          type: 'wifi',
+          mac: '00:1A:2B:CC:04:01',
+          channel: 44,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 20,
+          bandwidthMbps: 100,
+          submeshId: 'mesh_ind_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- DUAL-BAND INDUSTRIAL GATEWAYS ---
@@ -397,15 +645,41 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 680, y: 220 },
       mobilityModel: 'static',
       txPowerDbm: 25,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: true,
       queueCapacity: 128,
       currentQueue: [],
       isAlive: true,
       rplRank: 1,
       interfaces: [
-        { id: 'if_lgw1_wifi', type: 'wifi', mac: '00:1A:2B:LG:01:01', channel: 44, frequencyBand: '5.2GHz', txPowerDbm: 25, bandwidthMbps: 150 },
-        { id: 'if_lgw1_subg', type: 'zigbee', mac: '00:1A:2B:LG:01:02', channel: 1, frequencyBand: '915MHz', txPowerDbm: 20, bandwidthMbps: 1.5 }
+        {
+          id: 'if_lgw1_wifi',
+          type: 'wifi',
+          mac: '00:1A:2B:LG:01:01',
+          channel: 44,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 25,
+          bandwidthMbps: 150,
+          submeshId: 'mesh_ind_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
+        {
+          id: 'if_lgw1_subg',
+          type: 'zigbee',
+          mac: '00:1A:2B:LG:01:02',
+          channel: 1,
+          frequencyBand: '915MHz',
+          txPowerDbm: 20,
+          bandwidthMbps: 1.5,
+          submeshId: 'mesh_ind_sensor',
+          technology: '802.15.4',
+          receiverSensitivityDbm: -95,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_log_gw_aux',
@@ -415,15 +689,41 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 680, y: 440 },
       mobilityModel: 'static',
       txPowerDbm: 25,
+      receiverSensitivityDbm: -90,
+      isMultiRadio: true,
       queueCapacity: 128,
       currentQueue: [],
       isAlive: true,
       rplRank: 2,
       interfaces: [
-        { id: 'if_lgw2_wifi', type: 'wifi', mac: '00:1A:2B:LG:02:01', channel: 44, frequencyBand: '5.2GHz', txPowerDbm: 25, bandwidthMbps: 150 },
-        { id: 'if_lgw2_subg', type: 'zigbee', mac: '00:1A:2B:LG:02:02', channel: 1, frequencyBand: '915MHz', txPowerDbm: 20, bandwidthMbps: 1.5 }
+        {
+          id: 'if_lgw2_wifi',
+          type: 'wifi',
+          mac: '00:1A:2B:LG:02:01',
+          channel: 44,
+          frequencyBand: '5.2GHz',
+          txPowerDbm: 25,
+          bandwidthMbps: 150,
+          submeshId: 'mesh_ind_wifi',
+          technology: 'Wi-Fi 6',
+          receiverSensitivityDbm: -90,
+          isUp: true,
+        },
+        {
+          id: 'if_lgw2_subg',
+          type: 'zigbee',
+          mac: '00:1A:2B:LG:02:02',
+          channel: 1,
+          frequencyBand: '915MHz',
+          txPowerDbm: 20,
+          bandwidthMbps: 1.5,
+          submeshId: 'mesh_ind_sensor',
+          technology: '802.15.4',
+          receiverSensitivityDbm: -95,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 2: HIGH-BAY STORAGE RACKS ---
@@ -435,14 +735,28 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 450, y: 160 },
       mobilityModel: 'static',
       txPowerDbm: 14,
+      receiverSensitivityDbm: -95,
+      isMultiRadio: false,
       queueCapacity: 24,
       currentQueue: [],
       isAlive: true,
       rplRank: 3,
       interfaces: [
-        { id: 'if_rack_a', type: 'zigbee', mac: '00:1A:2B:RK:01:01', channel: 1, frequencyBand: '915MHz', txPowerDbm: 14, bandwidthMbps: 1.5 }
+        {
+          id: 'if_rack_a',
+          type: 'zigbee',
+          mac: '00:1A:2B:RK:01:01',
+          channel: 1,
+          frequencyBand: '915MHz',
+          txPowerDbm: 14,
+          bandwidthMbps: 1.5,
+          submeshId: 'mesh_ind_sensor',
+          technology: '802.15.4',
+          receiverSensitivityDbm: -95,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_log_rack_b',
@@ -452,14 +766,28 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 570, y: 160 },
       mobilityModel: 'static',
       txPowerDbm: 14,
+      receiverSensitivityDbm: -95,
+      isMultiRadio: false,
       queueCapacity: 24,
       currentQueue: [],
       isAlive: true,
       rplRank: 3,
       interfaces: [
-        { id: 'if_rack_b', type: 'zigbee', mac: '00:1A:2B:RK:02:01', channel: 1, frequencyBand: '915MHz', txPowerDbm: 14, bandwidthMbps: 1.5 }
+        {
+          id: 'if_rack_b',
+          type: 'zigbee',
+          mac: '00:1A:2B:RK:02:01',
+          channel: 1,
+          frequencyBand: '915MHz',
+          txPowerDbm: 14,
+          bandwidthMbps: 1.5,
+          submeshId: 'mesh_ind_sensor',
+          technology: '802.15.4',
+          receiverSensitivityDbm: -95,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
 
     // --- ZONE 5: DISPATCH LOADING DOCKS ---
@@ -471,14 +799,28 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 830, y: 180 },
       mobilityModel: 'static',
       txPowerDbm: 14,
+      receiverSensitivityDbm: -95,
+      isMultiRadio: false,
       queueCapacity: 24,
       currentQueue: [],
       isAlive: true,
       rplRank: 3,
       interfaces: [
-        { id: 'if_dock_1', type: 'zigbee', mac: '00:1A:2B:DK:01:01', channel: 1, frequencyBand: '915MHz', txPowerDbm: 14, bandwidthMbps: 1.5 }
+        {
+          id: 'if_dock_1',
+          type: 'zigbee',
+          mac: '00:1A:2B:DK:01:01',
+          channel: 1,
+          frequencyBand: '915MHz',
+          txPowerDbm: 14,
+          bandwidthMbps: 1.5,
+          submeshId: 'mesh_ind_sensor',
+          technology: '802.15.4',
+          receiverSensitivityDbm: -95,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_log_dock_2',
@@ -488,14 +830,28 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 830, y: 360 },
       mobilityModel: 'static',
       txPowerDbm: 14,
+      receiverSensitivityDbm: -95,
+      isMultiRadio: false,
       queueCapacity: 24,
       currentQueue: [],
       isAlive: true,
       rplRank: 3,
       interfaces: [
-        { id: 'if_dock_2', type: 'zigbee', mac: '00:1A:2B:DK:02:01', channel: 1, frequencyBand: '915MHz', txPowerDbm: 14, bandwidthMbps: 1.5 }
+        {
+          id: 'if_dock_2',
+          type: 'zigbee',
+          mac: '00:1A:2B:DK:02:01',
+          channel: 1,
+          frequencyBand: '915MHz',
+          txPowerDbm: 14,
+          bandwidthMbps: 1.5,
+          submeshId: 'mesh_ind_sensor',
+          technology: '802.15.4',
+          receiverSensitivityDbm: -95,
+          isUp: true,
+        },
       ],
-      routingTable: {}
+      routingTable: {},
     },
     {
       id: 'node_log_dock_3',
@@ -505,39 +861,53 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       position: { x: 830, y: 500 },
       mobilityModel: 'static',
       txPowerDbm: 14,
+      receiverSensitivityDbm: -95,
+      isMultiRadio: false,
       queueCapacity: 24,
       currentQueue: [],
       isAlive: true,
       rplRank: 4,
       interfaces: [
-        { id: 'if_dock_3', type: 'zigbee', mac: '00:1A:2B:DK:03:01', channel: 1, frequencyBand: '915MHz', txPowerDbm: 14, bandwidthMbps: 1.5 }
+        {
+          id: 'if_dock_3',
+          type: 'zigbee',
+          mac: '00:1A:2B:DK:03:01',
+          channel: 1,
+          frequencyBand: '915MHz',
+          txPowerDbm: 14,
+          bandwidthMbps: 1.5,
+          submeshId: 'mesh_ind_sensor',
+          technology: '802.15.4',
+          receiverSensitivityDbm: -95,
+          isUp: true,
+        },
       ],
-      routingTable: {}
-    }
+      routingTable: {},
+    },
   ];
 
   const links: NetworkLink[] = [
     // Wi-Fi 6 Backbone Links
-    { id: 'll_disp_agvhub', source: 'node_log_dispatch', target: 'node_log_agv_hub', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 16, snrDb: 29, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_disp_sort', source: 'node_log_dispatch', target: 'node_log_sort_bay', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 17, snrDb: 28, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_agvhub_sort', source: 'node_log_agv_hub', target: 'node_log_sort_bay', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 12, snrDb: 31, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_agvhub_gw1', source: 'node_log_agv_hub', target: 'node_log_gw_main', bandwidthMbps: 150, lossRate: 0.008, distanceMeters: 15, snrDb: 30, per: 0.008, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_sort_gw2', source: 'node_log_sort_bay', target: 'node_log_gw_aux', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 18, snrDb: 27, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_gw1_gw2', source: 'node_log_gw_main', target: 'node_log_gw_aux', bandwidthMbps: 300, lossRate: 0.005, distanceMeters: 11, snrDb: 34, per: 0.005, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
+    { id: 'll_disp_agvhub', source: 'node_log_dispatch', target: 'node_log_agv_hub', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 15.3, snrDb: 29, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 44 },
+    { id: 'll_disp_sort', source: 'node_log_dispatch', target: 'node_log_sort_bay', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 17.2, snrDb: 28, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 44 },
+    { id: 'll_agvhub_sort', source: 'node_log_agv_hub', target: 'node_log_sort_bay', bandwidthMbps: 100, lossRate: 0.01, distanceMeters: 9.9, snrDb: 31, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 44 },
+    { id: 'll_agvhub_gw1', source: 'node_log_agv_hub', target: 'node_log_gw_main', bandwidthMbps: 150, lossRate: 0.008, distanceMeters: 15.0, snrDb: 30, per: 0.008, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 44 },
+    { id: 'll_sort_gw2', source: 'node_log_sort_bay', target: 'node_log_gw_aux', bandwidthMbps: 150, lossRate: 0.01, distanceMeters: 20.3, snrDb: 27, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 44 },
+    { id: 'll_gw1_gw2', source: 'node_log_gw_main', target: 'node_log_gw_aux', bandwidthMbps: 300, lossRate: 0.005, distanceMeters: 11.0, snrDb: 34, per: 0.005, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 44 },
 
     // Dynamic Mobile Link to AGV Guidance Hub
-    { id: 'll_agv_mob_hub', source: 'node_log_agv_mobile', target: 'node_log_agv_hub', bandwidthMbps: 54, lossRate: 0.02, distanceMeters: 10, snrDb: 26, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
+    { id: 'll_agv_mob_hub', source: 'node_log_agv_mobile', target: 'node_log_agv_hub', bandwidthMbps: 54, lossRate: 0.02, distanceMeters: 10.0, snrDb: 26, per: 0.02, isSevered: false, isJammed: false, isDynamic: true, currentLoad: 0, traversalCount: 0, frequencyBand: '5.2GHz', channel: 44 },
 
     // MRMC Gateway Inter-domain links to 915MHz
-    { id: 'll_gw1_racka', source: 'node_log_gw_main', target: 'node_log_rack_a', bandwidthMbps: 1.5, lossRate: 0.02, distanceMeters: 12, snrDb: 24, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_gw1_rackb', source: 'node_log_gw_main', target: 'node_log_rack_b', bandwidthMbps: 1.5, lossRate: 0.015, distanceMeters: 8, snrDb: 27, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_gw1_dock1', source: 'node_log_gw_main', target: 'node_log_dock_1', bandwidthMbps: 1.5, lossRate: 0.01, distanceMeters: 9, snrDb: 26, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_gw2_dock2', source: 'node_log_gw_aux', target: 'node_log_dock_2', bandwidthMbps: 1.5, lossRate: 0.01, distanceMeters: 9, snrDb: 26, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
+    { id: 'll_gw1_racka', source: 'node_log_gw_main', target: 'node_log_rack_a', bandwidthMbps: 1.5, lossRate: 0.02, distanceMeters: 11.9, snrDb: 24, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '915MHz', channel: 1 },
+    { id: 'll_gw1_rackb', source: 'node_log_gw_main', target: 'node_log_rack_b', bandwidthMbps: 1.5, lossRate: 0.015, distanceMeters: 6.3, snrDb: 27, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '915MHz', channel: 1 },
+    { id: 'll_gw1_dock1', source: 'node_log_gw_main', target: 'node_log_dock_1', bandwidthMbps: 1.5, lossRate: 0.01, distanceMeters: 7.8, snrDb: 26, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '915MHz', channel: 1 },
+    { id: 'll_gw2_dock2', source: 'node_log_gw_aux', target: 'node_log_dock_2', bandwidthMbps: 1.5, lossRate: 0.01, distanceMeters: 8.5, snrDb: 26, per: 0.01, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '915MHz', channel: 1 },
 
     // 915MHz Sensor Mesh Links
-    { id: 'll_racka_rackb', source: 'node_log_rack_a', target: 'node_log_rack_b', bandwidthMbps: 1.5, lossRate: 0.02, distanceMeters: 6, snrDb: 28, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_dock1_dock2', source: 'node_log_dock_1', target: 'node_log_dock_2', bandwidthMbps: 1.5, lossRate: 0.015, distanceMeters: 9, snrDb: 25, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 },
-    { id: 'll_dock2_dock3', source: 'node_log_dock_2', target: 'node_log_dock_3', bandwidthMbps: 1.5, lossRate: 0.02, distanceMeters: 8, snrDb: 24, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0 }
+    { id: 'll_racka_rackb', source: 'node_log_rack_a', target: 'node_log_rack_b', bandwidthMbps: 1.5, lossRate: 0.02, distanceMeters: 6.0, snrDb: 28, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '915MHz', channel: 1 },
+    { id: 'll_dock1_dock2', source: 'node_log_dock_1', target: 'node_log_dock_2', bandwidthMbps: 1.5, lossRate: 0.015, distanceMeters: 9.0, snrDb: 25, per: 0.015, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '915MHz', channel: 1 },
+    { id: 'll_dock2_dock3', source: 'node_log_dock_2', target: 'node_log_dock_3', bandwidthMbps: 1.5, lossRate: 0.02, distanceMeters: 7.0, snrDb: 24, per: 0.02, isSevered: false, isJammed: false, currentLoad: 0, traversalCount: 0, frequencyBand: '915MHz', channel: 1 },
   ];
 
   return {
@@ -549,17 +919,23 @@ export function getSmartLogisticsTopology(): TopologyExportJSON {
       shadowingStdDevDb: 4.2,
       referenceDistanceMeters: 1.0,
       noiseFloorDbm: -92,
-      carrierFreqGhz: 2.4
+      carrierFreqGhz: 2.4,
+      seed: 12345,
+      fixedStepMs: 20,
+      rxSensitivityDbm: -90,
+      enableInterference: true,
+      enableCollisions: true,
+      defaultTtl: 16,
     },
     submeshes,
     nodes,
     links,
     meta: {
-      exportedAt: new Date().toISOString(),
-      version: '1.2.0',
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      version: '2.0.0',
       scenarioTitle: 'Smart Industrial Logistics Facility Multi-Mesh Benchmark',
-      authors: ['Preet Tank', 'Tejas Waghmode', 'Vansh Thakre']
-    }
+      authors: ['Preet Tank', 'Tejas Waghmode', 'Vansh Thakre'],
+    },
   };
 }
 
@@ -572,18 +948,19 @@ export function getMonolithicMeshTopology(): TopologyExportJSON {
       id: 'mesh_single',
       name: 'Monolithic Single-Domain Mesh',
       protocol: 'AODV',
+      technology: '802.11s',
+      defaultBandwidthMbps: 12,
       frequencyBand: '2.4GHz',
       channelWidthMhz: 20,
       channelNumber: 6,
       color: '#EF4444',
-      description: 'Demonstrates capacity collapse O(1 / sqrt(N)) and broadcast storm contention'
-    }
+      description: 'Demonstrates capacity collapse O(1 / sqrt(N)) and broadcast storm contention',
+    },
   ];
 
   const nodes: MeshNode[] = [];
   const links: NetworkLink[] = [];
 
-  // Generate a 4x4 grid of nodes sharing ONE channel
   for (let row = 0; row < 4; row++) {
     for (let col = 0; col < 4; col++) {
       const id = `node_flat_${row}_${col}`;
@@ -591,22 +968,35 @@ export function getMonolithicMeshTopology(): TopologyExportJSON {
         id,
         name: `Node [${row},${col}]`,
         submeshId: 'mesh_single',
-        type: (row === 0 && col === 0) ? 'router' : (row === 3 && col === 3) ? 'router' : 'sensor',
+        type: row === 0 && col === 0 ? 'router' : row === 3 && col === 3 ? 'router' : 'sensor',
         position: { x: 200 + col * 170, y: 150 + row * 110 },
         mobilityModel: 'static',
         txPowerDbm: 18,
+        receiverSensitivityDbm: -90,
+        isMultiRadio: false,
         queueCapacity: 16,
         currentQueue: [],
         isAlive: true,
         interfaces: [
-          { id: `if_${id}`, type: 'wifi', mac: `00:1A:2B:FF:${row}${col}:01`, channel: 6, frequencyBand: '2.4GHz', txPowerDbm: 18, bandwidthMbps: 20 }
+          {
+            id: `if_${id}`,
+            type: 'wifi',
+            mac: `00:1A:2B:FF:${row}${col}:01`,
+            channel: 6,
+            frequencyBand: '2.4GHz',
+            txPowerDbm: 18,
+            bandwidthMbps: 20,
+            submeshId: 'mesh_single',
+            technology: '802.11s',
+            receiverSensitivityDbm: -90,
+            isUp: true,
+          },
         ],
-        routingTable: {}
+        routingTable: {},
       });
     }
   }
 
-  // Connect adjacent nodes
   for (let r = 0; r < 4; r++) {
     for (let c = 0; c < 4; c++) {
       const curr = `node_flat_${r}_${c}`;
@@ -618,13 +1008,15 @@ export function getMonolithicMeshTopology(): TopologyExportJSON {
           target: right,
           bandwidthMbps: 12,
           lossRate: 0.08,
-          distanceMeters: 20,
+          distanceMeters: 8.5,
           snrDb: 15,
           per: 0.08,
           isSevered: false,
           isJammed: false,
           currentLoad: 0,
-          traversalCount: 0
+          traversalCount: 0,
+          frequencyBand: '2.4GHz',
+          channel: 6,
         });
       }
       if (r < 3) {
@@ -635,13 +1027,15 @@ export function getMonolithicMeshTopology(): TopologyExportJSON {
           target: down,
           bandwidthMbps: 12,
           lossRate: 0.08,
-          distanceMeters: 20,
+          distanceMeters: 5.5,
           snrDb: 15,
           per: 0.08,
           isSevered: false,
           isJammed: false,
           currentLoad: 0,
-          traversalCount: 0
+          traversalCount: 0,
+          frequencyBand: '2.4GHz',
+          channel: 6,
         });
       }
     }
@@ -656,16 +1050,22 @@ export function getMonolithicMeshTopology(): TopologyExportJSON {
       shadowingStdDevDb: 4.0,
       referenceDistanceMeters: 1.0,
       noiseFloorDbm: -90,
-      carrierFreqGhz: 2.4
+      carrierFreqGhz: 2.4,
+      seed: 12345,
+      fixedStepMs: 20,
+      rxSensitivityDbm: -90,
+      enableInterference: true,
+      enableCollisions: true,
+      defaultTtl: 16,
     },
     submeshes,
     nodes,
     links,
     meta: {
-      exportedAt: new Date().toISOString(),
-      version: '1.2.0',
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      version: '2.0.0',
       scenarioTitle: 'Monolithic Mesh Scaling Failure Benchmark',
-      authors: ['Preet Tank', 'Tejas Waghmode', 'Vansh Thakre']
-    }
+      authors: ['Preet Tank', 'Tejas Waghmode', 'Vansh Thakre'],
+    },
   };
 }
